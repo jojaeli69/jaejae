@@ -72,19 +72,38 @@ public class MainActivity extends Activity {
     String host=uri.getHost();if(host==null)return;
     switch(host){
       case "pick-photo":pick("photo");break;case "pick-report":pick("report");break;case "pick-other":pick("other");break;
-      case "camera-photo":camera();break;case "voice":voice();break;case "location":location();break;
+      case "camera-photo":camera("photo");break;case "camera-report":camera("report");break;case "voice":voice();break;case "location":location();break;
       case "choose-contact":contact();break;case "recent-calls":calls();break;
       case "open-attachment":openExternal(uri.getQueryParameter("uri"));break;
       case "exit":finish();break;
     }
   }
-  private void pick(String k){kind=k;Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);
-    i.addCategory(Intent.CATEGORY_OPENABLE);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-    i.setType(k.equals("photo")?"image/*":"*/*");i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);
-    if(k.equals("report"))i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/pdf","image/*","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/haansofthwp"});
-    try{startActivityForResult(i,FILES);}catch(Exception ex){toast("파일 선택 실패");}
+  private void pick(String k){kind=k;
+  if("photo".equals(k)){
+    // Android Photo Picker: native gallery with single-tap multi-selection.
+    if(Build.VERSION.SDK_INT>=33){
+      try{
+        Intent images=new Intent(MediaStore.ACTION_PICK_IMAGES);
+        images.setType("image/*");
+        images.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX,Math.min(100,MediaStore.getPickImagesMaxLimit()));
+        startActivityForResult(images,FILES);
+        return;
+      }catch(Exception ignored){}
+    }
+    Intent fallback=new Intent(Intent.ACTION_GET_CONTENT);
+    fallback.setType("image/*");fallback.addCategory(Intent.CATEGORY_OPENABLE);
+    fallback.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);
+    try{startActivityForResult(Intent.createChooser(fallback,"사진 여러 장 선택"),FILES);}
+    catch(Exception e){toast("갤러리를 열지 못했어");}
+    return;
   }
-  private void camera(){kind="photo";try{
+  Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+  i.addCategory(Intent.CATEGORY_OPENABLE);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+  i.setType("*/*");i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);
+  if("report".equals(k))i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/pdf","image/*","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/haansofthwp","application/x-hwp"});
+  try{startActivityForResult(i,FILES);}catch(Exception ex){toast("보고서·파일 선택기를 열지 못했어");}
+}
+  private void camera(String k){kind=k;try{
     ContentValues v=new ContentValues();v.put(MediaStore.Images.Media.DISPLAY_NAME,"너나메모_"+System.currentTimeMillis()+".jpg");
     v.put(MediaStore.Images.Media.MIME_TYPE,"image/jpeg");
     v.put(MediaStore.Images.Media.RELATIVE_PATH,Environment.DIRECTORY_PICTURES+"/너나메모");
@@ -149,7 +168,7 @@ public class MainActivity extends Activity {
         if(!all.isEmpty())importFiles(all,kind);}return;}
     if(code==CAMERA){if(photoUri!=null){Uri u=photoUri;photoUri=null;
         if(result==RESULT_OK){ContentValues v=new ContentValues();v.put(MediaStore.Images.Media.IS_PENDING,0);
-          getContentResolver().update(u,v,null,null);importFiles(Collections.singletonList(u),"photo");}
+          getContentResolver().update(u,v,null,null);importFiles(Collections.singletonList(u),kind);}
         else try{getContentResolver().delete(u,null,null);}catch(Exception ignored){} }return;}
     if(code==VOICE){if(result==RESULT_OK&&data!=null){ArrayList<String> s=data.getStringArrayListExtra("android.speech.extra.RESULTS");
         if(s!=null&&!s.isEmpty()){emit("nativeVoiceResult",Uri.encode(s.get(0)));return;}}
