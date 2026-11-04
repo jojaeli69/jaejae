@@ -29,6 +29,11 @@ public class MainActivity extends Activity {
   private void emit(String fn,String s){js("window."+fn+"("+JSONObject.quote(s)+")");}
   @Override public void onCreate(Bundle b){super.onCreate(b);
     tempDir=new File(getFilesDir(),"nnm-transfer");tempDir.mkdirs();
+    // Keep the image destination if Android recreates us during camera use.
+    String lastUri=b==null?null:b.getString("nnm.cameraUri");
+    if(lastUri==null)lastUri=getPreferences(MODE_PRIVATE).getString("nnm.cameraUri",null);
+    if(lastUri!=null)try{photoUri=Uri.parse(lastUri);}catch(Exception ignored){}
+    kind=b==null?getPreferences(MODE_PRIVATE).getString("nnm.cameraKind","photo"):b.getString("nnm.cameraKind","photo");
     web=new WebView(this);setContentView(web);
     WebSettings st=web.getSettings();st.setJavaScriptEnabled(true);st.setDomStorageEnabled(true);
     st.setDatabaseEnabled(true);st.setAllowContentAccess(true);st.setGeolocationEnabled(true);
@@ -103,17 +108,73 @@ public class MainActivity extends Activity {
   if("report".equals(k))i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/pdf","image/*","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/haansofthwp","application/x-hwp"});
   try{startActivityForResult(i,FILES);}catch(Exception ex){toast("보고서·파일 선택기를 열지 못했어");}
 }
-  private void camera(String k){kind=k;try{
-    ContentValues v=new ContentValues();v.put(MediaStore.Images.Media.DISPLAY_NAME,"너나메모_"+System.currentTimeMillis()+".jpg");
-    v.put(MediaStore.Images.Media.MIME_TYPE,"image/jpeg");
-    v.put(MediaStore.Images.Media.RELATIVE_PATH,Environment.DIRECTORY_PICTURES+"/너나메모");
-    v.put(MediaStore.Images.Media.IS_PENDING,1);
-    photoUri=getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,v);
-    if(photoUri==null)throw new IOException("Cannot insert photo");
-    Intent i=new Intent(MediaStore.ACTION_IMAGE_CAPTURE);i.putExtra(MediaStore.EXTRA_OUTPUT,photoUri);
-    i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_READ_URI_PERMISSION);
-    startActivityForResult(i,CAMERA);
-  }catch(Exception e){if(photoUri!=null)try{getContentResolver().delete(photoUri,null,null);}catch(Exception ignored){}photoUri=null;toast("카메라를 실행할 수 없어");}}
+  private void rememberCamera(){
+    getPreferences(MODE_PRIVATE).edit()
+      .putString("nnm.cameraUri",photoUri==null?null:photoUri.toString())
+      .putString("nnm.cameraKind",kind).apply();
+  }
+  @Override protected void onSaveInstanceState(Bundle bundle){
+    if(photoUri!=null)bundle.putString("nnm.cameraUri",photoUri.toString());
+    bundle.putString("nnm.cameraKind",kind);
+    super.onSaveInstanceState(bundle);
+  }
+  private void camera(String k){
+    kind=k;
+    try{
+      ContentValues v=new ContentValues();
+      v.put(MediaStore.Images.Media.DISPLAY_NAME,"너나메모_"+System.currentTimeMillis()+".jpg");
+      v.put(MediaStore.Images.Media.MIME_TYPE,"image/jpeg");
+      if(Build.VERSION.SDK_INT>=29)
+        v.put(MediaStore.Images.Media.RELATIVE_PATH,Environment.DIRECTORY_PICTURES+"/너나메모");
+      // Do not set IS_PENDING=1: the system camera runs as another app.
+      photoUri=getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,v);
+      if(photoUri==null){toast("사진 저장 위치를 만들 수 없어");return;}
+      rememberCamera();
+      Intent intent=new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+      intent.putExtra(MediaStore.EXTRA_OUTPUT,photoUri);
+      intent.setClipData(ClipData.newRawUri("NeonaMemo camera output",photoUri));
+      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+      for(android.content.pm.ResolveInfo info:getPackageManager().queryIntentActivities(intent,PackageManager.MATCH_DEFAULT_ONLY)){
+        if(info.activityInfo!=null)try{
+          grantUriPermission(info.activityInfo.packageName,photoUri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        }catch(Exception ignored){}
+      }
+      startActivityForResult(intent,CAMERA);
+    }catch(Exception e){
+      android.util.Log.e("NeonaMemoCamera","Camera intent failed",e);
+      toast("카메라 실행 실패");
+      if(photoUri!=null){discardPhoto(photoUri);photoUri=null;rememberCamera();}
+    }
+  }
+  private void discardPhoto(Uri uri){
+    try{getContentResolver().delete(uri,null,null);}
+    catch(Exception e){android.util.Log.w("NeonaMemoCamera","Cannot remove empty photo",e);}
+  }
+  private boolean photoHasData(Uri uri){
+    try(InputStream input=getContentResolver().openInputStream(uri)){
+      return input!=null&&input.read()!=-1;
+    }catch(Exception e){android.util.Log.w("NeonaMemoCamera","Camera output not readable",e);return false;}
+  }
+  private void finishCamera(int result){
+    final Uri uri=photoUri;final String currentKind=kind;
+    photoUri=null;rememberCamera();
+    if(uri==null){toast("사진 저장 위치가 사라졌어. 다시 촬영해줘");return;}
+    new Thread(()->{
+      if(result==RESULT_OK){
+        boolean ready=false;
+        for(int i=0;i<10;i++){
+          if(photoHasData(uri)){ready=true;break;}
+          try{Thread.sleep(220);}catch(InterruptedException ignored){Thread.currentThread().interrupt();break;}
+        }
+        if(ready)importFiles(Collections.singletonList(uri),currentKind);
+        else {discardPhoto(uri);toast("사진이 저장되지 않았어. 다시 촬영해줘");}
+      } else if(!photoHasData(uri))discardPhoto(uri);
+      else toast("촬영이 취소됐어. 갤러리에서 사진을 선택할 수 있어");
+      try{revokeUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);}
+      catch(Exception ignored){}
+    },"NNM-ReturnFromCamera").start();
+  }
   private void voice(){try{
     Intent i=new Intent("android.speech.action.RECOGNIZE_SPEECH");
     i.putExtra("android.speech.extra.LANGUAGE_MODEL","free_form");
@@ -166,10 +227,7 @@ public class MainActivity extends Activity {
         if(data.getClipData()!=null){for(int i=0;i<data.getClipData().getItemCount();i++)all.add(data.getClipData().getItemAt(i).getUri());}
         else if(data.getData()!=null)all.add(data.getData());
         if(!all.isEmpty())importFiles(all,kind);}return;}
-    if(code==CAMERA){if(photoUri!=null){Uri u=photoUri;photoUri=null;
-        if(result==RESULT_OK){ContentValues v=new ContentValues();v.put(MediaStore.Images.Media.IS_PENDING,0);
-          getContentResolver().update(u,v,null,null);importFiles(Collections.singletonList(u),kind);}
-        else try{getContentResolver().delete(u,null,null);}catch(Exception ignored){} }return;}
+    if(code==CAMERA){finishCamera(result);return;}
     if(code==VOICE){if(result==RESULT_OK&&data!=null){ArrayList<String> s=data.getStringArrayListExtra("android.speech.extra.RESULTS");
         if(s!=null&&!s.isEmpty()){emit("nativeVoiceResult",Uri.encode(s.get(0)));return;}}
       js("window.nativeVoiceError()");return;}
