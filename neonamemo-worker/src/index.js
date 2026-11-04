@@ -10,7 +10,7 @@ async function digest(s){const a=new Uint8Array(await crypto.subtle.digest("SHA-
 async function body(req){const raw=await req.text();if(raw.length>1600)throw Error("body too long");return JSON.parse(raw);}
 function admin(req,env){const actual=req.headers.get("x-admin-key")||"",want=env.OWNER_ADMIN_KEY;if(!want||want.length<24)return false;const a=new TextEncoder().encode(actual),b=new TextEncoder().encode(want);let diff=a.length^b.length;for(let i=0;i<Math.max(a.length,b.length);i++)diff|=(a[i]||0)^(b[i]||0);return diff===0;}
 async function device(req,env){const a=req.headers.get("authorization")||"";if(!a.startsWith("Bearer "))return null;const token=a.slice(7).toLowerCase();if(!hex(token))return null;return env.DEVICES.get("device:"+await digest(token),"json");}
-function cors(req){const origin=req.headers.get("origin");if(!origin)return {};const u=new URL(req.url);const valid=[u.origin,"https://appassets.androidplatform.net","https://neonamemo.local"];if(!valid.includes(origin))return null;return {"access-control-allow-origin":origin,"vary":"Origin","access-control-allow-headers":"authorization,content-type,x-admin-key","access-control-allow-methods":"GET,POST,OPTIONS"};}
+function cors(req){const origin=req.headers.get("origin");if(!origin)return {};const u=new URL(req.url);const valid=[u.origin,"https://appassets.androidplatform.net","https://neonamemo.local"];if(!valid.includes(origin))return null;return {"access-control-allow-origin":origin,"vary":"Origin","access-control-allow-headers":"authorization,content-type,x-admin-key,x-nnm-workspace-key","access-control-allow-methods":"GET,POST,OPTIONS"};}
 const ADMIN_HTML=[
 "<!doctype html><html lang='ko'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
 "<title>너나메모 승인</title><style>body{font-family:system-ui;max-width:540px;margin:2rem auto;padding:1rem;background:#f5f7fa;color:#142238}button,input{font:inherit;padding:.75rem;border:1px solid #bbb;border-radius:.6rem;margin:.25rem}button{background:#173d85;color:white}li{padding:.5rem 0}</style>",
@@ -69,4 +69,60 @@ async function approval(req,env,approve){
   return respond({ok:true,approved:d.approved});
 }
 async function lookup(req,env){const d=await device(req,env);if(!d)return error(401,"기기 인증 필요");await autoApprove(d,env);if(!d.approved)return error(403,"관리자에 의해 차단된 기기");if(!env.KAKAO_REST_API_KEY)return error(503,"카카오 키 미설정");let b;try{b=await body(req);}catch{return error(400,"입력값 오류");}const lat=Number(b.latitude),lon=Number(b.longitude),acc=Number(b.accuracyMeters);if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<33||lat>39.6||lon<124||lon>132)return error(422,"한국 GPS 좌표 필요");if(!Number.isFinite(acc)||acc<0||acc>100)return error(422,"GPS 정확도 확인 필요");const u=new URL(KAKAO_URL);u.searchParams.set("x",String(lon));u.searchParams.set("y",String(lat));u.searchParams.set("input_coord","WGS84");let r;try{r=await fetch(u,{headers:{authorization:"KakaoAK "+env.KAKAO_REST_API_KEY,accept:"application/json"},signal:AbortSignal.timeout(8000)});}catch{return error(502,"주소 서버 연결 실패");}if(!r.ok)return error(502,r.status===401||r.status===403?"카카오 키 또는 활성화 확인 필요":"주소조회 오류");let data;try{data=await r.json();}catch{return error(502,"응답 오류");}const doc=data?.documents?.[0]||{},a=doc.address;if(!a?.address_name)return error(404,"지번주소 없음");const main=a.main_address_no||"",sub=a.sub_address_no||"";return respond({ok:true,source:"kakao",address:a.address_name,roadAddress:doc.road_address?.address_name||"",province:a.region_1depth_name||"",cityCounty:a.region_2depth_name||"",village:a.region_3depth_name||"",lot:[main,sub].filter(Boolean).join("-"),mainLot:main,subLot:sub,accuracyMeters:acc,needsConfirmation:true});}
-export default {async fetch(req,env){const u=new URL(req.url),c=cors(req);if(c===null)return error(403,"허용되지 않은 출처");if(req.method==="OPTIONS")return new Response(null,{status:204,headers:c});let r;if((u.pathname==="/"||u.pathname==="/health")&&req.method==="GET")r=respond({ok:true,service:"너나메모 주소조회",enrollment:"automatic",checks:{devices:Boolean(env.DEVICES),kakao:Boolean(env.KAKAO_REST_API_KEY),admin:Boolean(env.OWNER_ADMIN_KEY&&env.OWNER_ADMIN_KEY.length>=24)},configured:Boolean(env.DEVICES&&env.KAKAO_REST_API_KEY&&env.OWNER_ADMIN_KEY&&env.OWNER_ADMIN_KEY.length>=24)});else if(u.pathname==="/admin"&&req.method==="GET")r=new Response(ADMIN_HTML,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none';script-src 'unsafe-inline';style-src 'unsafe-inline';connect-src 'self';base-uri 'none';frame-ancestors 'none'"}});else if(!env.DEVICES)r=error(503,"DEVICES KV 연결 필요");else if(u.pathname==="/v1/device/register"&&req.method==="POST")r=await register(req,env);else if(u.pathname==="/v1/device/status"&&req.method==="GET"){const d=await device(req,env);if(d)await autoApprove(d,env);r=d?respond({ok:true,status:d.approved?"approved":"pending"}):error(401,"등록 안 된 기기");}else if(u.pathname==="/v1/address/reverse"&&req.method==="POST")r=await lookup(req,env);else if(u.pathname.startsWith("/v1/admin/")){if(!admin(req,env))r=error(401,"관리자 인증 실패");else if(u.pathname==="/v1/admin/devices"&&req.method==="GET")r=await list(env);else if(u.pathname==="/v1/admin/approve"&&req.method==="POST")r=await approval(req,env,true);else if(u.pathname==="/v1/admin/revoke"&&req.method==="POST")r=await approval(req,env,false);else r=error(404,"없는 경로");}else r=error(404,"없는 경로");for(const [k,v] of Object.entries(c))r.headers.set(k,v);return r;}};
+
+const NNM_SHARED_KINDS=new Set(['record','task']);
+function nnmValidId(id){return typeof id==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(id)}
+async function nnmWorkspace(req){
+ const token=req.headers.get('x-nnm-workspace-key')||'';
+ if(!/^[0-9a-f]{64}$/.test(token))return null;
+ return 'nnm36:'+await digest(token)+':';
+}
+async function nnmReadBody(req,limit){
+ let n=Number(req.headers.get('content-length'));
+ if(n>limit)throw Error('payload too large');
+ let raw=await req.text();if(raw.length>limit)throw Error('payload too large');
+ return JSON.parse(raw);
+}
+function nnmCipher(s){return typeof s==='string'&&s.length<380000&&/^[A-Za-z0-9+/=]+\.[A-Za-z0-9+/=]+$/.test(s)}
+async function nnmShareRoutes(req,env,u){
+ const ns=await nnmWorkspace(req);if(!ns)return error(401,'공유 앱 인증정보가 없음');
+ if(!env.DEVICES)return error(503,'공유 저장소 미연결');
+ const path=u.pathname;
+ if(path==='/v1/share/items'){
+  if(req.method==='GET'){
+   const kind=u.searchParams.get('kind'),cursor=u.searchParams.get('cursor');
+   if(!NNM_SHARED_KINDS.has(kind))return error(422,'잘못된 기록 종류');
+   let page;try{page=await env.DEVICES.list({prefix:ns+kind+':',limit:50,...(cursor?{cursor}:{})})}catch{return error(400,'목록 커서 오류')}
+   let items=[];for(const k of page.keys){let item=await env.DEVICES.get(k.name,'json');if(item?.id)items.push(item)}
+   return respond({ok:true,items,cursor:page.list_complete?'':page.cursor||''});
+  }
+  if(req.method==='POST'){
+   let b;try{b=await nnmReadBody(req,450000)}catch{return error(413,'기록 데이터가 너무 큼')}
+   if(!NNM_SHARED_KINDS.has(b.kind)||!nnmValidId(b.id)||typeof b.mtime!=='string'||b.mtime.length>40||!/^\d{4}-\d\d-\d\dT/.test(b.mtime)||!nnmCipher(b.data))return error(422,'기록 형식 오류');
+   const key=ns+b.kind+':'+b.id;
+   const old=await env.DEVICES.get(key,'json');
+   if(old?.mtime&&old.mtime>b.mtime)return error(409,'stale: 저장소의 내용이 더 최신');
+   await env.DEVICES.put(key,JSON.stringify({id:b.id,mtime:b.mtime,data:b.data,deleted:!!b.deleted}));
+   return respond({ok:true,saved:true,id:b.id});
+  }
+  return error(405,'지원하지 않는 요청');
+ }
+ const m=/^\/v1\/share\/files\/([a-zA-Z0-9_-]{1,100})\/(\d{1,4})$/.exec(path);
+ if(m){
+  const part=Number(m[2]);if(part>=300)return error(422,'파일 조각 최대 300개');
+  const key=ns+'file:'+m[1]+':'+part;
+  if(req.method==='GET'){
+    const data=await env.DEVICES.get(key);return data?respond({ok:true,data}):error(404,'원본 파일 조각 없음');
+  }
+  if(req.method==='PUT'){
+    let b;try{b=await nnmReadBody(req,410000)}catch{return error(413,'파일 조각 크기 초과')}
+    if(!nnmCipher(b.data))return error(422,'암호화 파일 조각 형식 오류');
+    await env.DEVICES.put(key,b.data);
+    return respond({ok:true,saved:true});
+  }
+  return error(405,'지원하지 않는 요청');
+ }
+ return error(404,'없는 공유 API');
+}
+
+export default {async fetch(req,env){const u=new URL(req.url),c=cors(req);if(c===null)return error(403,"허용되지 않은 출처");if(req.method==="OPTIONS")return new Response(null,{status:204,headers:c});let r;if((u.pathname==="/"||u.pathname==="/health")&&req.method==="GET")r=respond({ok:true,service:"너나메모 주소조회",enrollment:"automatic",checks:{devices:Boolean(env.DEVICES),kakao:Boolean(env.KAKAO_REST_API_KEY),admin:Boolean(env.OWNER_ADMIN_KEY&&env.OWNER_ADMIN_KEY.length>=24)},configured:Boolean(env.DEVICES&&env.KAKAO_REST_API_KEY&&env.OWNER_ADMIN_KEY&&env.OWNER_ADMIN_KEY.length>=24)});else if(u.pathname==="/admin"&&req.method==="GET")r=new Response(ADMIN_HTML,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none';script-src 'unsafe-inline';style-src 'unsafe-inline';connect-src 'self';base-uri 'none';frame-ancestors 'none'"}});else if(!env.DEVICES)r=error(503,"DEVICES KV 연결 필요");else if(u.pathname==="/v1/device/register"&&req.method==="POST")r=await register(req,env);else if(u.pathname==="/v1/device/status"&&req.method==="GET"){const d=await device(req,env);if(d)await autoApprove(d,env);r=d?respond({ok:true,status:d.approved?"approved":"pending"}):error(401,"등록 안 된 기기");}else if(u.pathname==="/v1/address/reverse"&&req.method==="POST")r=await lookup(req,env);else if(u.pathname.startsWith("/v1/share/"))r=await nnmShareRoutes(req,env,u);else if(u.pathname.startsWith("/v1/admin/")){if(!admin(req,env))r=error(401,"관리자 인증 실패");else if(u.pathname==="/v1/admin/devices"&&req.method==="GET")r=await list(env);else if(u.pathname==="/v1/admin/approve"&&req.method==="POST")r=await approval(req,env,true);else if(u.pathname==="/v1/admin/revoke"&&req.method==="POST")r=await approval(req,env,false);else r=error(404,"없는 경로");}else r=error(404,"없는 경로");for(const [k,v] of Object.entries(c))r.headers.set(k,v);return r;}};
