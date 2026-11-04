@@ -10,5 +10,6 @@
       "binding": "DEVICES",
       "id": "bdf3b2c3e3fd49c9b5fe3d7c75af27db"
     }
-  ]
+  ],
+  "keep_vars": true
 }
