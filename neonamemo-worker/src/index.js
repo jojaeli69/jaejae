@@ -84,6 +84,42 @@ async function nnmReadBody(req,limit){
  return JSON.parse(raw);
 }
 function nnmCipher(s){return typeof s==='string'&&s.length<380000&&/^[A-Za-z0-9+/=]+\.[A-Za-z0-9+/=]+$/.test(s)}
+
+/* v4.2 optional R2 storage: private binding, encrypted binary content.
+ * If FILES_R2 is not bound, all existing KV operations are unchanged.
+ * Existing KV attachments remain readable; successful reads copy to R2.
+ * Destructive archive cleanup is intentionally NOT implemented here.
+ */
+function nnmB64Binary(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
+function nnmBinaryB64(arr){
+ let str='';for(let i=0;i<arr.length;i+=8192)str+=String.fromCharCode(...arr.subarray(i,i+8192));
+ return btoa(str);
+}
+function nnmR2Pack(s){
+ const parts=s.split('.');
+ if(parts.length!==2)throw Error('잘못된 파일 암호문');
+ const iv=nnmB64Binary(parts[0]),cipher=nnmB64Binary(parts[1]);
+ if(iv.length!==12||cipher.length<16)throw Error('암호문 크기 오류');
+ const out=new Uint8Array(iv.length+cipher.length);out.set(iv);out.set(cipher,12);return out;
+}
+function nnmR2Unpack(bytes){
+ if(bytes.length<28)throw Error('원본 데이터 손상');
+ return nnmBinaryB64(bytes.subarray(0,12))+'.'+nnmBinaryB64(bytes.subarray(12));
+}
+function nnmR2Enabled(env){return !!env.FILES_R2;}
+async function nnmR2Usage(req,env,ns,u){
+ if(!nnmR2Enabled(env))return respond({ok:true,enabled:false,reason:'FILES_R2 binding not configured'});
+ const cursor=u.searchParams.get('cursor')||undefined;
+ let page;try{
+  page=await env.FILES_R2.list({prefix:ns+'file:',limit:1000,...(cursor?{cursor}:{})});
+ }catch{return error(502,'R2 용량 조회 실패')}
+ let bytes=0;
+ for(const obj of page.objects)bytes+=Number(obj.size)||0;
+ return respond({ok:true,enabled:true,scannedBytes:bytes,scannedObjects:page.objects.length,
+   cursor:page.truncated?page.cursor||'':'',hasMore:!!page.truncated,
+   targetBytes:10000000000,alertBytes:9000000000,needsArchiveCheck:false});
+}
+
 async function nnmShareRoutes(req,env,u){
  const ns=await nnmWorkspace(req);if(!ns)return error(401,'공유 앱 인증정보가 없음');
  if(!env.DEVICES)return error(503,'공유 저장소 미연결');
@@ -107,18 +143,40 @@ async function nnmShareRoutes(req,env,u){
   }
   return error(405,'지원하지 않는 요청');
  }
+ if(path==='/v1/share/r2/usage'&&req.method==='GET')
+  return nnmR2Usage(req,env,ns,u);
  const m=/^\/v1\/share\/files\/([a-zA-Z0-9_-]{1,100})\/(\d{1,4})$/.exec(path);
  if(m){
   const part=Number(m[2]);if(part>=300)return error(422,'파일 조각 최대 300개');
   const key=ns+'file:'+m[1]+':'+part;
   if(req.method==='GET'){
-    const data=await env.DEVICES.get(key);return data?respond({ok:true,data}):error(404,'원본 파일 조각 없음');
+    if(nnmR2Enabled(env)){
+      const object=await env.FILES_R2.get(key);
+      if(object){
+        try{return respond({ok:true,data:nnmR2Unpack(new Uint8Array(await object.arrayBuffer()))});}
+        catch{return error(502,'R2 파일 손상 또는 읽기 실패')}
+      }
+    }
+    const data=await env.DEVICES.get(key);
+    if(!data)return error(404,'원본 파일 조각 없음');
+    // Lazy copy: never delete the legacy KV chunk during migration.
+    if(nnmR2Enabled(env)&&nnmCipher(data)){
+      try{await env.FILES_R2.put(key,nnmR2Pack(data),
+        {httpMetadata:{contentType:'application/octet-stream'}});}catch(e){
+        console.warn('Legacy file R2 copy skipped',String(e).slice(0,120));
+      }
+    }
+    return respond({ok:true,data});
   }
   if(req.method==='PUT'){
     let b;try{b=await nnmReadBody(req,410000)}catch{return error(413,'파일 조각 크기 초과')}
     if(!nnmCipher(b.data))return error(422,'암호화 파일 조각 형식 오류');
-    await env.DEVICES.put(key,b.data);
-    return respond({ok:true,saved:true});
+    if(nnmR2Enabled(env)){
+      try{await env.FILES_R2.put(key,nnmR2Pack(b.data),
+        {httpMetadata:{contentType:'application/octet-stream'}});}
+      catch(e){console.error('R2 upload failed',String(e).slice(0,120));return error(503,'R2 원본 저장 실패')}
+    }else await env.DEVICES.put(key,b.data);
+    return respond({ok:true,saved:true,storage:nnmR2Enabled(env)?'r2':'kv'});
   }
   return error(405,'지원하지 않는 요청');
  }
