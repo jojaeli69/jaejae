@@ -120,26 +120,60 @@ async function nnmR2Usage(req,env,ns,u){
    targetBytes:10000000000,alertBytes:9000000000,needsArchiveCheck:false});
 }
 
+
+/* NeonaMemo v4.6: strongly consistent record metadata R2 mirror.
+ * KV is kept for legacy compatibility, existing records are never deleted. */
+function nnmSharedR2Key(ns,kind,id){return ns+'item:'+kind+':'+id}
+async function nnmSharedItemsFromR2(env,ns,kind,cursor){
+ const list=await env.FILES_R2.list({prefix:ns+'item:'+kind+':',limit:50,...(cursor?{cursor}:{})});
+ const items=[];
+ for(const k of list.objects){
+  const obj=await env.FILES_R2.get(k.key);
+  if(obj){const value=await obj.json();if(value?.id)items.push(value);}
+ }
+ return {items,cursor:list.truncated?'r2:'+(list.cursor||''):''};
+}
+
 async function nnmShareRoutes(req,env,u){
  const ns=await nnmWorkspace(req);if(!ns)return error(401,'공유 앱 인증정보가 없음');
  if(!env.DEVICES)return error(503,'공유 저장소 미연결');
  const path=u.pathname;
  if(path==='/v1/share/items'){
   if(req.method==='GET'){
-   const kind=u.searchParams.get('kind'),cursor=u.searchParams.get('cursor');
+   const kind=u.searchParams.get('kind'),cursor=u.searchParams.get('cursor')||'';
    if(!NNM_SHARED_KINDS.has(kind))return error(422,'잘못된 기록 종류');
-   let page;try{page=await env.DEVICES.list({prefix:ns+kind+':',limit:50,...(cursor?{cursor}:{})})}catch{return error(400,'목록 커서 오류')}
-   let items=[];for(const k of page.keys){let item=await env.DEVICES.get(k.name,'json');if(item?.id)items.push(item)}
-   return respond({ok:true,items,cursor:page.list_complete?'':page.cursor||''});
+   const useR2=nnmR2Enabled(env);
+   if(useR2&&cursor.startsWith('r2:')){
+    try{const page=await nnmSharedItemsFromR2(env,ns,kind,cursor.slice(3));return respond({ok:true,...page})}
+    catch(e){console.error('R2 list failure',String(e).slice(0,150));return error(503,'R2 기록 목록 조회 실패')}
+   }
+   let page;
+   const kvCursor=cursor.startsWith('kv:')?cursor.slice(3):cursor;
+   try{page=await env.DEVICES.list({prefix:ns+kind+':',limit:50,...(kvCursor?{cursor:kvCursor}:{})})}
+   catch{return error(400,'목록 커서 오류')}
+   const items=[];
+   for(const k of page.keys){const item=await env.DEVICES.get(k.name,'json');if(item?.id)items.push(item)}
+   const next=page.list_complete?(useR2?'r2:':''):'kv:'+(page.cursor||'');
+   return respond({ok:true,items,cursor:next});
   }
   if(req.method==='POST'){
    let b;try{b=await nnmReadBody(req,450000)}catch{return error(413,'기록 데이터가 너무 큼')}
-   if(!NNM_SHARED_KINDS.has(b.kind)||!nnmValidId(b.id)||typeof b.mtime!=='string'||b.mtime.length>40||!/^\d{4}-\d\d-\d\dT/.test(b.mtime)||!nnmCipher(b.data))return error(422,'기록 형식 오류');
-   const key=ns+b.kind+':'+b.id;
-   const old=await env.DEVICES.get(key,'json');
-   if(old?.mtime&&old.mtime>b.mtime)return error(409,'stale: 저장소의 내용이 더 최신');
-   await env.DEVICES.put(key,JSON.stringify({id:b.id,mtime:b.mtime,data:b.data,deleted:!!b.deleted}));
-   return respond({ok:true,saved:true,id:b.id});
+   if(!NNM_SHARED_KINDS.has(b.kind)||!nnmValidId(b.id)||typeof b.mtime!=='string'||b.mtime.length>40||!/^\\d{4}-\\d\\d-\\d\\dT/.test(b.mtime)||!nnmCipher(b.data))return error(422,'기록 형식 오류');
+   const key=ns+b.kind+':'+b.id,entry={id:b.id,mtime:b.mtime,data:b.data,deleted:!!b.deleted};
+   if(nnmR2Enabled(env)){
+    const r2key=nnmSharedR2Key(ns,b.kind,b.id);
+    try{
+     const current=await env.FILES_R2.get(r2key);
+     if(current){const prev=await current.json();if(prev?.mtime&&prev.mtime>b.mtime)return error(409,'stale: 저장소의 내용이 더 최신')}
+     await env.FILES_R2.put(r2key,JSON.stringify(entry),{httpMetadata:{contentType:'application/json'}});
+    }catch(e){console.error('R2 record write failed',String(e).slice(0,160));return error(503,'R2 기록 저장 실패')}
+    try{await env.DEVICES.put(key,JSON.stringify(entry))}catch(e){console.warn('KV mirror delayed',String(e).slice(0,140))}
+   }else{
+    const previous=await env.DEVICES.get(key,'json');
+    if(previous?.mtime&&previous.mtime>b.mtime)return error(409,'stale: 저장소의 내용이 더 최신');
+    await env.DEVICES.put(key,JSON.stringify(entry));
+   }
+   return respond({ok:true,saved:true,id:b.id,metadataStorage:nnmR2Enabled(env)?'r2':'kv'});
   }
   return error(405,'지원하지 않는 요청');
  }
