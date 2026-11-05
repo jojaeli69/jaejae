@@ -70,7 +70,7 @@ async function approval(req,env,approve){
 }
 async function lookup(req,env){const d=await device(req,env);if(!d)return error(401,"기기 인증 필요");await autoApprove(d,env);if(!d.approved)return error(403,"관리자에 의해 차단된 기기");if(!env.KAKAO_REST_API_KEY)return error(503,"카카오 키 미설정");let b;try{b=await body(req);}catch{return error(400,"입력값 오류");}const lat=Number(b.latitude),lon=Number(b.longitude),acc=Number(b.accuracyMeters);if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<33||lat>39.6||lon<124||lon>132)return error(422,"한국 GPS 좌표 필요");if(!Number.isFinite(acc)||acc<0||acc>100)return error(422,"GPS 정확도 확인 필요");const u=new URL(KAKAO_URL);u.searchParams.set("x",String(lon));u.searchParams.set("y",String(lat));u.searchParams.set("input_coord","WGS84");let r;try{r=await fetch(u,{headers:{authorization:"KakaoAK "+env.KAKAO_REST_API_KEY,accept:"application/json"},signal:AbortSignal.timeout(8000)});}catch{return error(502,"주소 서버 연결 실패");}if(!r.ok)return error(502,r.status===401||r.status===403?"카카오 키 또는 활성화 확인 필요":"주소조회 오류");let data;try{data=await r.json();}catch{return error(502,"응답 오류");}const doc=data?.documents?.[0]||{},a=doc.address;if(!a?.address_name)return error(404,"지번주소 없음");const main=a.main_address_no||"",sub=a.sub_address_no||"";return respond({ok:true,source:"kakao",address:a.address_name,roadAddress:doc.road_address?.address_name||"",province:a.region_1depth_name||"",cityCounty:a.region_2depth_name||"",village:a.region_3depth_name||"",lot:[main,sub].filter(Boolean).join("-"),mainLot:main,subLot:sub,accuracyMeters:acc,needsConfirmation:true});}
 
-const NNM_SHARED_KINDS=new Set(['record','task']);
+const NNM_SHARED_KINDS=new Set(['record','task','note']);
 function nnmValidId(id){return typeof id==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(id)}
 async function nnmWorkspace(req){
  const token=req.headers.get('x-nnm-workspace-key')||'';
@@ -143,6 +143,15 @@ async function nnmShareRoutes(req,env,u){
    const kind=u.searchParams.get('kind'),cursor=u.searchParams.get('cursor')||'';
    if(!NNM_SHARED_KINDS.has(kind))return error(422,'잘못된 기록 종류');
    const useR2=nnmR2Enabled(env);
+   // Short shared messages are R2-only: read-after-write immediately across
+   // two devices, without stale KV lists or 60s cache propagation.
+   if(kind==='note'){
+    if(!useR2)return error(503,'R2 공유메모 저장소 연결 필요');
+    try{
+     const page=await nnmSharedItemsFromR2(env,ns,kind,cursor.startsWith('r2:')?cursor.slice(3):cursor);
+     return respond({ok:true,...page});
+    }catch(e){console.error('R2 memo list failed',String(e).slice(0,140));return error(503,'공유메모 조회 실패')}
+   }
    if(useR2&&cursor.startsWith('r2:')){
     try{const page=await nnmSharedItemsFromR2(env,ns,kind,cursor.slice(3));return respond({ok:true,...page})}
     catch(e){console.error('R2 list failure',String(e).slice(0,150));return error(503,'R2 기록 목록 조회 실패')}
@@ -167,7 +176,8 @@ async function nnmShareRoutes(req,env,u){
      if(current){const prev=await current.json();if(prev?.mtime&&prev.mtime>b.mtime)return error(409,'stale: 저장소의 내용이 더 최신')}
      await env.FILES_R2.put(r2key,JSON.stringify(entry),{httpMetadata:{contentType:'application/json'}});
     }catch(e){console.error('R2 record write failed',String(e).slice(0,160));return error(503,'R2 기록 저장 실패')}
-    try{await env.DEVICES.put(key,JSON.stringify(entry))}catch(e){console.warn('KV mirror delayed',String(e).slice(0,140))}
+    if(b.kind!=='note')try{await env.DEVICES.put(key,JSON.stringify(entry))}
+    catch(e){console.warn('KV mirror delayed',String(e).slice(0,140))}
    }else{
     const previous=await env.DEVICES.get(key,'json');
     if(previous?.mtime&&previous.mtime>b.mtime)return error(409,'stale: 저장소의 내용이 더 최신');
