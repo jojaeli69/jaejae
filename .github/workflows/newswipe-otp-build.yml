@@ -42,13 +42,23 @@ jobs:
           cd newswipe
           git apply --unidiff-zero --check NewSwipe-OTP.patch
           git apply --unidiff-zero NewSwipe-OTP.patch
-          ./gradlew --no-daemon assembleDebug
+          # Restore clipboard chip on IME open even if copying occurred while it was closed.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("app/src/main/java/com/alternative_studios/newswipe/NewSwipeIME.java")
+          s = p.read_text()
+          needle = "        refreshToolbarVisibility();   // 입력란이 바뀌면 복사한 내용 칩의 가림 여부도 다시 정한다 (비밀번호 입력란)"
+          assert s.count(needle) == 1, "Clipboard patch target must be unique"
+          s = s.replace(needle, "        onPrimaryClipChanged();  // refresh clipboard chip on input view open" + chr(10) + needle)
+          p.write_text(s)
+          PY
+          ./gradlew --no-daemon assembleRelease
           mkdir -p ../built
-          cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-OTP-debug.apk
-          sha256sum ../built/NewSwipe-OTP-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-OTP-Release.apk
+          sha256sum ../built/NewSwipe-OTP-Release.apk
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: NewSwipe-OTP-debug-apk
-          path: built/NewSwipe-OTP-debug.apk
+          name: NewSwipe-OTP-Release-apk
+          path: built/NewSwipe-OTP-Release.apk
           if-no-files-found: error
