@@ -20,8 +20,15 @@ jobs:
           java-version: '21'
       - name: Install Android SDK 36
         run: |
-          echo 'Using GitHub-hosted runner Android SDK'
-          /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          set -euo pipefail
+          export ANDROID_HOME="$HOME/android-sdk"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          mkdir -p "$ANDROID_HOME/cmdline-tools" /tmp/newswipe-tools
+          curl --fail -L --retry 3 --silent --show-error "https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip" -o /tmp/android-tools.zip
+          unzip -q /tmp/android-tools.zip -d /tmp/newswipe-tools
+          mv /tmp/newswipe-tools/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
       - name: Build upstream NewSwipe with OTP consent source patch
         shell: bash
         run: |
