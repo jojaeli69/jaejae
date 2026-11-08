@@ -1,8 +1,8 @@
-name: NewSwipe OTP and Photo Clipboard build
+name: NewSwipe OTP plain text fix and photo clipboard
 on:
   push:
     branches:
-      - build-newswipe-image-20261109
+      - build-newswipe-otpfix-20261109
   workflow_dispatch:
 
 permissions:
@@ -43,6 +43,8 @@ jobs:
           git apply --unidiff-zero --check NewSwipe-OTP.patch
           git apply --unidiff-zero NewSwipe-OTP.patch
           python3 ../newswipe/apply_image_clip.py
+          base64 -d ../newswipe/otpfix.b64 | gzip -d > ../newswipe/fix_otp.py
+          python3 ../newswipe/fix_otp.py
           python3 - <<'PY'
           from pathlib import Path
           p = Path("app/build.gradle.kts")
@@ -50,24 +52,24 @@ jobs:
           assert s.count("versionCode = 21") == 1
           assert s.count('versionName = "1.9.1"') == 1
           assert s.count("    buildTypes {\n        release {") == 1
-          s = s.replace("versionCode = 21", "versionCode = 22")
-          s = s.replace('versionName = "1.9.1"', 'versionName = "1.9.2-photo"')
-          s = s.replace("    buildTypes {\n        release {", '    buildTypes {\n        debug {\n            applicationIdSuffix = ".phototest"\n            versionNameSuffix = "-test"\n        }\n        release {')
+          s = s.replace("versionCode = 21", "versionCode = 23")
+          s = s.replace('versionName = "1.9.1"', 'versionName = "1.9.3-otp"')
+          s = s.replace("    buildTypes {\n        release {", '    buildTypes {\n        debug {\n            applicationIdSuffix = ".otpfix"\n            versionNameSuffix = "-test"\n        }\n        release {')
           p.write_text(s)
           Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
-          Path("app/src/debug/res/values/strings.xml").write_text('<resources><string name="app_name">NewSwipe 사진판</string></resources>\n')
+          Path("app/src/debug/res/values/strings.xml").write_text('<resources><string name="app_name">NewSwipe 인증수정</string></resources>\n')
           PY
           ./gradlew --no-daemon assembleDebug assembleRelease
           mkdir -p ../built
-          cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-Photo-OTP-SideBySide-TEST.apk
-          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-Photo-OTP-Release-TEST.apk
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging ../built/NewSwipe-Photo-OTP-SideBySide-TEST.apk | head -5
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-Photo-OTP-SideBySide-TEST.apk
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-Photo-OTP-Release-TEST.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-OTPFix-SideBySide-TEST.apk
+          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-OTPFix-Release-TEST.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging ../built/NewSwipe-OTPFix-SideBySide-TEST.apk | head -5
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-OTPFix-SideBySide-TEST.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-OTPFix-Release-TEST.apk
           sha256sum ../built/*.apk
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: NewSwipe-Photo-OTP-apks
+          name: NewSwipe-OTPFix-apks
           path: built/*.apk
           if-no-files-found: error
