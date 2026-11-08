@@ -1,8 +1,8 @@
-name: NewSwipe OTP APK build
+name: NewSwipe OTP and Photo Clipboard build
 on:
   push:
     branches:
-      - build-newswipe-otp-20261109
+      - build-newswipe-image-20261109
   workflow_dispatch:
 
 permissions:
@@ -30,35 +30,42 @@ jobs:
           mv /tmp/newswipe-tools/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
-      - name: Build upstream NewSwipe with OTP consent source patch
+      - name: Patch upstream NewSwipe OTP and photo quick paste
         shell: bash
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/TechTree-Alt/NewSwipe.git newswipe
+          git clone --depth 1 https://github.com/TechTree-Alt/NewSwipe.git upstream-newswipe
           cat newswipe-payload.part{1..7} > /tmp/newswipe-complete.b64
           base64 -d /tmp/newswipe-complete.b64 > /tmp/newswipe-source.tar.gz
           echo "90686e3957d69de4649af6f8c778af3b7cd0c174df269955a5eda8ffef138778  /tmp/newswipe-source.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/newswipe-source.tar.gz -C newswipe
-          cd newswipe
+          tar -xzf /tmp/newswipe-source.tar.gz -C upstream-newswipe
+          cd upstream-newswipe
           git apply --unidiff-zero --check NewSwipe-OTP.patch
           git apply --unidiff-zero NewSwipe-OTP.patch
-          # Restore clipboard chip on IME open even if copying occurred while it was closed.
+          python3 ../newswipe/apply_image_clip.py
           python3 - <<'PY'
           from pathlib import Path
-          p = Path("app/src/main/java/com/alternative_studios/newswipe/NewSwipeIME.java")
+          p = Path("app/build.gradle.kts")
           s = p.read_text()
-          needle = "        refreshToolbarVisibility();   // 입력란이 바뀌면 복사한 내용 칩의 가림 여부도 다시 정한다 (비밀번호 입력란)"
-          assert s.count(needle) == 1, "Clipboard patch target must be unique"
-          s = s.replace(needle, "        onPrimaryClipChanged();  // refresh clipboard chip on input view open" + chr(10) + needle)
+          assert s.count("versionCode = 21") == 1
+          assert s.count('versionName = "1.9.1"') == 1
+          assert s.count("    buildTypes {\n        release {") == 1
+          s = s.replace("versionCode = 21", "versionCode = 22")
+          s = s.replace('versionName = "1.9.1"', 'versionName = "1.9.2-photo"')
+          s = s.replace("    buildTypes {\n        release {", '    buildTypes {\n        debug {\n            applicationIdSuffix = ".phototest"\n            versionNameSuffix = "-test"\n        }\n        release {')
           p.write_text(s)
           PY
-          ./gradlew --no-daemon assembleRelease
+          ./gradlew --no-daemon assembleDebug assembleRelease
           mkdir -p ../built
-          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-OTP-Release.apk
-          sha256sum ../built/NewSwipe-OTP-Release.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-Photo-OTP-SideBySide-TEST.apk
+          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-Photo-OTP-Release-TEST.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging ../built/NewSwipe-Photo-OTP-SideBySide-TEST.apk | head -5
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-Photo-OTP-SideBySide-TEST.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-Photo-OTP-Release-TEST.apk
+          sha256sum ../built/*.apk
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: NewSwipe-OTP-Release-apk
-          path: built/NewSwipe-OTP-Release.apk
+          name: NewSwipe-Photo-OTP-apks
+          path: built/*.apk
           if-no-files-found: error
