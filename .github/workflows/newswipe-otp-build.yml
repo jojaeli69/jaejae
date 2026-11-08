@@ -28,7 +28,10 @@ jobs:
         run: |
           set -euo pipefail
           git clone --depth 1 https://github.com/TechTree-Alt/NewSwipe.git newswipe
-          base64 -d newswipe-otp-payload.b64 | tar -xz -C newswipe
+          cat newswipe-payload.part{1..7} > /tmp/newswipe-complete.b64
+          base64 -d /tmp/newswipe-complete.b64 > /tmp/newswipe-source.tar.gz
+          echo "90686e3957d69de4649af6f8c778af3b7cd0c174df269955a5eda8ffef138778  /tmp/newswipe-source.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/newswipe-source.tar.gz -C newswipe
           cd newswipe
           git apply --unidiff-zero --check NewSwipe-OTP.patch
           git apply --unidiff-zero NewSwipe-OTP.patch
