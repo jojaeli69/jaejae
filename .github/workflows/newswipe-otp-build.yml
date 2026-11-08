@@ -54,6 +54,8 @@ jobs:
           s = s.replace('versionName = "1.9.1"', 'versionName = "1.9.2-photo"')
           s = s.replace("    buildTypes {\n        release {", '    buildTypes {\n        debug {\n            applicationIdSuffix = ".phototest"\n            versionNameSuffix = "-test"\n        }\n        release {')
           p.write_text(s)
+          Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
+          Path("app/src/debug/res/values/strings.xml").write_text('<resources><string name="app_name">NewSwipe 사진판</string></resources>\n')
           PY
           ./gradlew --no-daemon assembleDebug assembleRelease
           mkdir -p ../built
