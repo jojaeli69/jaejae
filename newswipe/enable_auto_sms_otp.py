@@ -78,7 +78,7 @@ final class SmsCodeAutoBridge {
     private SmsCodeAutoBridge(Context context) { app = context; }
 
     private boolean providerSelected() {
-        AutofillManager mgr = (AutofillManager) app.getSystemService(Context.AUTOFILL_MANAGER_SERVICE);
+        AutofillManager mgr = (AutofillManager) app.getSystemService(AutofillManager.class);
         return mgr != null && mgr.hasEnabledAutofillServices();
     }
 
@@ -196,7 +196,7 @@ public final class OtpAutoSetupActivity extends Activity {
     }
 
     private boolean providerSelected() {
-        AutofillManager mgr = (AutofillManager) getSystemService(AUTOFILL_MANAGER_SERVICE);
+        AutofillManager mgr = (AutofillManager) getSystemService(AutofillManager.class);
         return mgr != null && mgr.hasEnabledAutofillServices();
     }
 
