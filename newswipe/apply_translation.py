@@ -13,8 +13,8 @@ manifest.write_text(m)
 # ML Kit on-device translation, no server or API key, models loaded on demand.
 gradle=Path("app/build.gradle.kts")
 g=gradle.read_text()
-assert '    dependencies {' in g
-g=g.replace('    dependencies {','    dependencies {\n        implementation("com.google.mlkit:translate:17.0.3")',1)
+assert '\ndependencies {\n' in g
+g=g.replace('\ndependencies {\n','\ndependencies {\n    implementation("com.google.mlkit:translate:17.0.3")\n',1)
 gradle.write_text(g)
 
 p=pkg/"NewSwipeIME.java"
