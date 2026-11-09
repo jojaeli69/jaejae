@@ -1,0 +1,46 @@
+name: Publish NewSwipe v2.0.5 direct APK download
+on:
+  push:
+    branches:
+      - build-newswipe-live-screenshot-v205-20261109
+    paths:
+      - .github/workflows/publish-newswipe-v205.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download existing verified APK build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          gh run download 42591174146 --repo ${{ github.repository }} --name NewSwipe-v205-apks --dir release
+          test -s release/NewSwipe-v205-TEST.apk
+          cp release/NewSwipe-v205-TEST.apk release/NewSwipe-v2.0.5.apk
+          echo "823585c6f6294da945e97008593a53d566a8cd2059c0507b10885591c9d40309  release/NewSwipe-v2.0.5.apk" | sha256sum -c -
+          (cd release && zip -9 -j NewSwipe-v2.0.5-install.zip NewSwipe-v2.0.5.apk)
+          unzip -t release/NewSwipe-v2.0.5-install.zip
+          sha256sum release/NewSwipe-v2.0.5*
+      - name: Publish stable, public download URLs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "NewSwipe-v2.0.5-20261109" \
+            release/NewSwipe-v2.0.5.apk release/NewSwipe-v2.0.5-install.zip \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "NewSwipe v2.0.5 · 캡처 감지 및 한손모드 버튼 제거" \
+            --notes "갤럭시 S25용 별도 설치 시험판입니다. 기존 NewSwipe와 함께 설치할 수 있습니다. 키보드가 열린 상태에서 새 스크린샷을 감지하고, 한손모드 툴바 아이콘을 제거했습니다. 사진 감지 기능에는 이미지 전체 접근 권한이 필요합니다. 입력 앱이 이미지 삽입을 지원하지 않는 경우 자동 삽입할 수 없습니다. 갤럭시 S25 실기기 기능 테스트는 미완료입니다." \
+            --latest=false
+          gh release view "NewSwipe-v2.0.5-20261109" --repo "${{ github.repository }}" --json url,assets
