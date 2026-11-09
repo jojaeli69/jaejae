@@ -1,8 +1,8 @@
-name: NewSwipe native icon adaptive touch and hold-space cursor
+name: NewSwipe proportional touch learning with symmetric shared hit zones
 on:
   push:
     branches:
-      - build-newswipe-adaptive-v201-20261109
+      - build-newswipe-balanced-touch-v202-20261109
   workflow_dispatch:
 
 permissions:
@@ -54,6 +54,11 @@ jobs:
           python3 ../newswipe/fix_translate_edit_v200.py
           cp ../newswipe/AdaptiveTouch.java app/src/main/java/com/alternative_studios/newswipe/keyboard/AdaptiveTouch.java
           python3 ../newswipe/enable_adaptive_keyboard_v201.py
+          cp ../newswipe/TouchBiasMath.java app/src/main/java/com/alternative_studios/newswipe/keyboard/TouchBiasMath.java
+          cp ../newswipe/AdaptiveTouchV202.java app/src/main/java/com/alternative_studios/newswipe/keyboard/AdaptiveTouch.java
+          mkdir -p /tmp/newswipe-touch-test
+          javac -d /tmp/newswipe-touch-test ../newswipe/TouchBiasMath.java ../newswipe/TouchBiasMathTest.java
+          java -cp /tmp/newswipe-touch-test com.alternative_studios.newswipe.keyboard.TouchBiasMathTest
           python3 - <<'PY'
           from pathlib import Path
           p = Path("app/build.gradle.kts")
@@ -62,12 +67,12 @@ jobs:
           assert s.count('versionName = "1.9.1"') == 1
           assert s.count("    buildTypes {\n        release {") == 1
           s = s.replace("        versionCode = 21", "        ndk {\n            abiFilters.add(\"arm64-v8a\")\n        }\n        versionCode = 21")
-          s = s.replace("versionCode = 21", "versionCode = 31")
-          s = s.replace('versionName = "1.9.1"', 'versionName = "2.0.1-adaptive"')
-          s = s.replace("    buildTypes {\n        release {", '    buildTypes {\n        debug {\n            applicationIdSuffix = ".adaptive"\n            versionNameSuffix = "-test"\n        }\n        release {')
+          s = s.replace("versionCode = 21", "versionCode = 32")
+          s = s.replace('versionName = "1.9.1"', 'versionName = "2.0.2-balanced"')
+          s = s.replace("    buildTypes {\n        release {", '    buildTypes {\n        debug {\n            applicationIdSuffix = ".balanced"\n            versionNameSuffix = "-test"\n        }\n        release {')
           p.write_text(s)
           Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
-          Path("app/src/debug/res/values/strings.xml").write_text('<resources><string name="app_name">NewSwipe 오타학습</string></resources>\n')
+          Path("app/src/debug/res/values/strings.xml").write_text('<resources><string name="app_name">NewSwipe 균형학습</string></resources>\n')
           PY
           sed -i '/^networkTimeout=/d' gradle/wrapper/gradle-wrapper.properties
           printf '\nnetworkTimeout=120000\n' >> gradle/wrapper/gradle-wrapper.properties
@@ -79,15 +84,15 @@ jobs:
             sleep 8
           done
           mkdir -p ../built
-          cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-v201-TEST.apk
-          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-v201-REPLACE.apk
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging ../built/NewSwipe-v201-TEST.apk | head -5
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-v201-TEST.apk
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-v201-REPLACE.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-v202-TEST.apk
+          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-v202-REPLACE.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging ../built/NewSwipe-v202-TEST.apk | head -5
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-v202-TEST.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-v202-REPLACE.apk
           sha256sum ../built/*.apk
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: NewSwipe-v201-apks
+          name: NewSwipe-v202-apks
           path: built/*.apk
           if-no-files-found: error
