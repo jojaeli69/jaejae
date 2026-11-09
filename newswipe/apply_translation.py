@@ -63,8 +63,8 @@ sub('''        for (String id : order[0]) toolbar.addView(toolButtonOf(id));
                 new LinearLayout.LayoutParams(Ui.dp(this, 47), toolbarHeight));
         toolbar.addView(toolSpacer, new LinearLayout.LayoutParams(0, 1, 1f));''','tool order add')
 
-sub('''        toolbar.setVisibility(panel == PANEL_SEARCH || !(on || suggesting) ? View.GONE : View.VISIBLE);''',
-'''        toolbar.setVisibility(panel == PANEL_SEARCH || !(on || suggesting) ? View.GONE : View.VISIBLE);
+sub('''        boolean on = prefs.toolbar() || toolbarOnlyNow();''',
+'''        boolean on = prefs.toolbar() || toolbarOnlyNow();
         if (translateQuickButton != null) {
             translateQuickButton.setVisibility(on && !passwordField && !candidates
                     && panel == PANEL_KEYBOARD ? View.VISIBLE : View.GONE);
