@@ -3,6 +3,12 @@ from pathlib import Path
 base=Path("app/src/main")
 pkg=base/"java/com/alternative_studios/newswipe"
 (source:=pkg/"KeyboardTranslatePanel.java").write_bytes(Path("../newswipe/KeyboardTranslatePanel.java").read_bytes())
+# Internet is used only to download on-device language models (no text upload).
+manifest=base/"AndroidManifest.xml"
+m=manifest.read_text()
+assert '<uses-permission android:name="android.permission.INTERNET" />' not in m
+m=m.replace('<uses-permission android:name="android.permission.VIBRATE" />','<uses-permission android:name="android.permission.VIBRATE" />\n    <uses-permission android:name="android.permission.INTERNET" />',1)
+manifest.write_text(m)
 
 # ML Kit on-device translation, no server or API key, models loaded on demand.
 gradle=Path("app/build.gradle.kts")
