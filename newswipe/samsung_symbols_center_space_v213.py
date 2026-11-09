@@ -37,7 +37,7 @@ change(
     '''    private static KeyboardLayout symbols(String back, Prefs prefs, boolean five) {
         List<Row> rows = new ArrayList<>();''',
     '''    private static KeyboardLayout symbols(String back, Prefs prefs, boolean five) {
-        if (prefs != null && prefs.koreanDubeolsik()) return samsungSymbols(back, prefs, five, false);
+        if (prefs != null) return samsungSymbols(back, prefs, five, false);
         List<Row> rows = new ArrayList<>();''',
     "real first symbol page"
 )
@@ -45,7 +45,7 @@ change(
     '''    private static KeyboardLayout symbols2(String back, Prefs prefs, boolean five) {
         List<Row> rows = new ArrayList<>();''',
     '''    private static KeyboardLayout symbols2(String back, Prefs prefs, boolean five) {
-        if (prefs != null && prefs.koreanDubeolsik()) return samsungSymbols(back, prefs, five, true);
+        if (prefs != null) return samsungSymbols(back, prefs, five, true);
         List<Row> rows = new ArrayList<>();''',
     "real second symbol page"
 )
@@ -106,7 +106,7 @@ change(
         List<Key> keys = new ArrayList<>();
         int spaceAt = bottomKeys(modeType, modeLabel, prefs, emojiKey, keys);''',
     '''        float span = to - from;
-        if (prefs != null && prefs.koreanDubeolsik() && prefs.centeredSpacebar()
+        if (prefs != null && prefs.centeredSpacebar()
                 && !prefs.splitView() && span >= 9.95f
                 && prefs.bottomKeyShown(BottomKeys.MODE)
                 && prefs.bottomKeyShown(BottomKeys.SPACE)
@@ -142,7 +142,7 @@ replace_one(
         // The wide, symmetric bottom row omits the separate globe key.
         // Keep language switching reachable: hold !#1/가/ABC. Respect
         // explicit non-default custom mode long-press assignments.
-        if (prefs != null && prefs.koreanDubeolsik() && prefs.centeredSpacebar()
+        if (prefs != null && prefs.centeredSpacebar()
                 && SwipeAction.EMOJI_OPEN.equals(out[MODE])) out[MODE] = SwipeAction.LANGUAGE;
         return out;''',
     "language switching remains reachable"
