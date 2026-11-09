@@ -198,7 +198,7 @@ s=s[:start]+dedent('''\
         });
     }
 
-'''),s[start:end].split("    private boolean quickImageReady()")[0] if False else '')+s[end:]
+''')+s[end:]
 # dedent produces leading 0 chars because embedded four spaces? dedent removes four,
 # re-indent into Java class scope.
 # (Handled separately by content above after dedent, fix any top-level helpers)
@@ -208,5 +208,147 @@ new_end=s.index('    /**',new_begin) if False else s.index('    private void off
 new_block=s[new_begin:new_end]
 # if dedent yields 0-indent methods, ensure Java formatting but syntax allows indentation 0.
 # We deliberately avoid brittle formatting transforms.
+
+# Robust image discovery even if Samsung writes multiple URI entries or
+# places a timestamp-less clipboard item while the IME is hidden.
+sub('''        ClipData.Item first = clip.getItemAt(0);
+        String copiedImage = imageMime(desc, first.getUri());
+        if (chip) {
+            if (copiedImage != null && !sensitive && history && prefs.clipboardImages()) {
+                offerQuickImage(first.getUri());
+            } else if (first.getUri() == null && first.getText() != null) {
+                offerClipChip(first.getText(), sensitive);
+            } else {
+                dismissClipChip();
+            }
+        }''',
+'''        ClipData.Item first = clip.getItemAt(0);
+        Uri firstImage = firstImageUri(clip);
+        String copiedImage = imageMime(desc, firstImage);
+        if (firstImage != null) lastImageClipboardKey = firstImage.toString();
+        if (chip) {
+            if (copiedImage != null && !sensitive) {
+                offerQuickImage(firstImage, copiedImage, false);
+            } else if (firstImage == null && first.getText() != null) {
+                offerClipChip(first.getText(), sensitive);
+            } else {
+                dismissClipChip();
+            }
+        }''','Samsung image item / clipboard quick chip')
+
+sub('''        String imageMime = copiedImage;
+        if (imageMime != null) {
+            if (prefs.clipboardImages()) saveClipImage(first.getUri(), imageMime);''',
+'''        String imageMime = copiedImage;
+        if (imageMime != null) {
+            if (prefs.clipboardImages() && history && !sensitive)
+                saveClipImage(firstImage, imageMime);''','history save actual image URI')
+
+# The first supported MIME may be image/* (wildcard); find the actual concrete
+# MIME using the URI provider and image file extension when needed.
+sub('''    private String imageMime(ClipDescription desc, Uri uri) {
+        if (uri == null || !"content".equals(uri.getScheme())) return null;
+        if (desc != null) {
+            for (int i = 0; i < desc.getMimeTypeCount(); i++) {
+                String m = ClipboardHistory.cleanMime(desc.getMimeType(i));
+                if (m != null && !m.equals("image/*")) return m;
+            }
+        }
+        try {
+            return ClipboardHistory.cleanMime(getContentResolver().getType(uri));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }''',
+'''    private String imageMime(ClipDescription desc, Uri uri) {
+        if (uri == null || !"content".equals(uri.getScheme())) return null;
+        if (desc != null) {
+            for (int i = 0; i < desc.getMimeTypeCount(); i++) {
+                String m = ClipboardHistory.cleanMime(desc.getMimeType(i));
+                if (m != null && !m.equals("image/*")) return m;
+            }
+        }
+        try {
+            String exact=ClipboardHistory.cleanMime(getContentResolver().getType(uri));
+            if (exact != null && !exact.equals("image/*")) return exact;
+        } catch (RuntimeException ignored) {
+            // Some Samsung clipboard URIs omit getType().
+        }
+        String path=uri.getLastPathSegment();
+        if (path!=null) {
+            String lower=path.toLowerCase(java.util.Locale.ROOT);
+            if (lower.endsWith(".png")) return "image/png";
+            if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+            if (lower.endsWith(".webp")) return "image/webp";
+            if (lower.endsWith(".heic") || lower.endsWith(".heif")) return "image/heic";
+        }
+        return null;
+    }''','MIME type detection')
+
+# The clipboard image is saved only after the chip is tapped. The former
+# 'pasteQuickImage' looked in persistent history for a same-time image, which
+# failed for screenshots copied while the IME was hidden.
+start=s.index('''    private void pasteImage(ClipboardHistory.Item item) {''')
+end=s.index('''    private static boolean acceptsContent(''',start)
+s=s[:start]+'''    private void pasteImage(ClipboardHistory.Item item) {
+        if (item != null) pasteImageById(item.text,item.mime);
+    }
+
+    private void pasteImageById(String id, String mime) {
+        if (!ClipboardHistory.isImageId(id) || ClipboardHistory.cleanMime(mime)==null
+                || !ClipboardHistory.original(clipHistory.imageDir(), id).isFile()) {
+            Toast.makeText(this, "이미지 파일을 읽지 못했습니다", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Uri local=ClipImageProvider.uri(this,id,mime);
+        InputConnection input=getCurrentInputConnection();
+        if (input!=null && acceptsContent(getCurrentInputEditorInfo(),mime)) {
+            commitComposing();
+            try {
+                InputContentInfo image=new InputContentInfo(local,
+                        new ClipDescription("이미지",new String[]{mime}));
+                if (input.commitContent(image,
+                        InputConnection.INPUT_CONTENT_GRANT_READ_URI_PERMISSION,null)) {
+                    return;
+                }
+            } catch(RuntimeException unsupported) {
+                // Some editors claim image MIME support but reject rich content.
+            }
+        }
+        if (clipboard!=null) {
+            try {
+                clipboard.setPrimaryClip(ClipData.newUri(getContentResolver(),"캡처 이미지",local));
+                Toast.makeText(this,
+                        "사진을 클립보드에 복사했습니다. 이 앱은 키보드 사진 삽입을 지원하지 않아 "
+                        + "앱의 첨부 또는 붙여넣기를 이용해야 합니다.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            } catch (RuntimeException ignored) {}
+        }
+        Toast.makeText(this,"이 입력창에서는 이미지 전송을 지원하지 않습니다",
+                Toast.LENGTH_LONG).show();
+    }
+
+'''+s[end:]
+
+# Don't clear the most recent image merely because text-copy preview changed.
+sub('''        quickImageUri = null;
+        // 비밀번호 입력란에서''',
+'''        quickImageUri = null;
+        quickImageMime = null;
+        quickImageFromScreenshot = false;
+        // 비밀번호 입력란에서''','reset image when text clipboard replaces it')
+sub('''        quickImageUri = null;
+        refreshToolbarVisibility();''',
+'''        quickImageUri = null;
+        quickImageMime = null;
+        quickImageFromScreenshot = false;
+        refreshToolbarVisibility();''','reset image state on dismiss')
+
+# Add a status hint when the user explicitly opens the clipboard panel.
+# Existing history remains unchanged: old saved images still work.
+assert "checkRecentScreenshot();" in s
+assert "pasteImageById(finalId,mime)" in s
+
 p.write_text(s,encoding="utf-8")
 print("Integrated clipboard refresh, Samsung multi-item images, screenshot gallery fallback and direct image-paste path.")
