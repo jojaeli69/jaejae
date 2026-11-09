@@ -34,7 +34,7 @@ replace('''    private String lastRecentScreenshotKey;''',
     private final Runnable screenshotScanRunnable = this::checkRecentScreenshot;''',
 'visible-only content observer fields')
 
-replace('''    private void checkRecentScreenshot() {
+replace('''private void checkRecentScreenshot() {
         if (!prefs.clipboardChip() || !RecentScreenshot.allowed(this)
                 || panel!=PANEL_KEYBOARD || passwordField || quickImageReady()) return;''',
 '''    private void checkRecentScreenshot() {
@@ -61,7 +61,7 @@ replace('''                if (r==null || gen!=pasteInputGeneration || panel!=PA
 
 # Monitor gallery saves only when keyboard is showing and the user has granted
 # full image access. No persistent background service and no broad media polling.
-anchor='''    private void checkRecentScreenshot() {'''
+anchor='''private void checkRecentScreenshot() {'''
 assert s.count(anchor)==1
 s=s.replace(anchor,'''    /** Only listen for new screenshot files while this keyboard is visible. */
     private void startScreenshotObserver() {
