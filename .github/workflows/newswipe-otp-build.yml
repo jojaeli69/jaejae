@@ -1,8 +1,8 @@
-name: NewSwipe Samsung-style translation UI with Samsung Pass
+name: NewSwipe native translation appearance with Samsung-style workflow
 on:
   push:
     branches:
-      - build-newswipe-samsung-translate-197
+      - build-newswipe-native-translate-198
   workflow_dispatch:
 
 permissions:
@@ -49,6 +49,7 @@ jobs:
           python3 ../newswipe/enable_sms_direct.py
           python3 ../newswipe/apply_translation.py
           python3 ../newswipe/apply_samsung_translate.py
+          python3 ../newswipe/apply_native_translate.py
           python3 - <<'PY'
           from pathlib import Path
           p = Path("app/build.gradle.kts")
@@ -57,24 +58,24 @@ jobs:
           assert s.count('versionName = "1.9.1"') == 1
           assert s.count("    buildTypes {\n        release {") == 1
           s = s.replace("        versionCode = 21", "        ndk {\n            abiFilters.add(\"arm64-v8a\")\n        }\n        versionCode = 21")
-          s = s.replace("versionCode = 21", "versionCode = 27")
-          s = s.replace('versionName = "1.9.1"', 'versionName = "1.9.7-samsung"')
-          s = s.replace("    buildTypes {\n        release {", '    buildTypes {\n        debug {\n            applicationIdSuffix = ".samsungtranslate"\n            versionNameSuffix = "-test"\n        }\n        release {')
+          s = s.replace("versionCode = 21", "versionCode = 28")
+          s = s.replace('versionName = "1.9.1"', 'versionName = "1.9.8-native"')
+          s = s.replace("    buildTypes {\n        release {", '    buildTypes {\n        debug {\n            applicationIdSuffix = ".nativetranslate"\n            versionNameSuffix = "-test"\n        }\n        release {')
           p.write_text(s)
           Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
-          Path("app/src/debug/res/values/strings.xml").write_text('<resources><string name="app_name">NewSwipe 삼성번역</string></resources>\n')
+          Path("app/src/debug/res/values/strings.xml").write_text('<resources><string name="app_name">NewSwipe 자연번역</string></resources>\n')
           PY
           ./gradlew --no-daemon assembleDebug assembleRelease
           mkdir -p ../built
-          cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-Samsung-Translate-TEST.apk
-          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-Samsung-Translate-REPLACE.apk
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging ../built/NewSwipe-Samsung-Translate-TEST.apk | head -5
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-Samsung-Translate-TEST.apk
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-Samsung-Translate-REPLACE.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-Native-Translate-TEST.apk
+          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-Native-Translate-REPLACE.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging ../built/NewSwipe-Native-Translate-TEST.apk | head -5
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-Native-Translate-TEST.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-Native-Translate-REPLACE.apk
           sha256sum ../built/*.apk
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: NewSwipe-Samsung-Translate-apks
+          name: NewSwipe-Native-Translate-apks
           path: built/*.apk
           if-no-files-found: error
