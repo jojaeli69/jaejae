@@ -178,7 +178,7 @@ s=s.replace(needle, '''            autofill.addView(button("문자 인증번호 
                     + "Android 버전에 따라 보호된 인증번호 문자는 접근할 수 없을 수 있습니다."));''',1)
 # Avoid misleading consent-only messaging in the settings toggle.
 s=s.replace('문자 인증번호 제안 (승인 필요)','문자 인증번호 자동 추천')
-s=s.replace('인증번호 입력칸을 열고 문자가 도착하면 키보드에 \\'문자 승인\\' 버튼이 뜹니다.',
+s=s.replace("인증번호 입력칸을 열고 문자가 도착하면 키보드에 '문자 승인' 버튼이 뜹니다.",
             '문자 수신 권한을 허용하면 인증번호를 자동 추천합니다. 권한이 없으면 Google 문자 읽기 승인이 필요할 수 있습니다.')
 # Open the permission setup exactly once after onboarding; never change the autofill service.
 needle='''        updateStatus();
