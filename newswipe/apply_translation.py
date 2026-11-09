@@ -101,12 +101,10 @@ sub('''    public void onStartInputView(EditorInfo info, boolean restarting) {
         translationInputGeneration++;
         super.onStartInputView(info, restarting);''','track editing field')
 
-sub('''    public void onFinishInput() {
-        finishComposingOnLeave();''',
+sub('''    public void onFinishInput() {''',
 '''    public void onFinishInput() {
         closeTranslationPanel();
-        translationInputGeneration++;
-        finishComposingOnLeave();''','input end')
+        translationInputGeneration++;''','input end')
 
 sub('''    public void onDestroy() {
         if (clipboard != null) clipboard.removePrimaryClipChangedListener(this);''',
