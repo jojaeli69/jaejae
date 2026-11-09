@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - newswipe-stable-updates-20261109
+      - newswipe-v212-build-20261109
   workflow_dispatch:
 
 permissions:
