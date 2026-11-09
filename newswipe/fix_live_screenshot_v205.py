@@ -92,12 +92,14 @@ s=s.replace(anchor,'''    /** Only listen for new screenshot files while this ke
 
 '''+anchor,1)
 
-replace('''        windowHidden = false;
-        refreshHwToolbar();''',
-'''        windowHidden = false;
-        startScreenshotObserver();
-        scheduleScreenshotScan();
-        refreshHwToolbar();''','resume screenshot watch onWindowShown')
+replace('''    public void onWindowShown() {''',
+'''    public void onWindowShown() {
+        main.post(() -> {
+            if (!windowHidden) {
+                startScreenshotObserver();
+                scheduleScreenshotScan();
+            }
+        });''','resume screenshot watch onWindowShown')
 
 replace('''        pasteInputGeneration++;
         windowHidden = false;''',
@@ -106,17 +108,13 @@ replace('''        pasteInputGeneration++;
         startScreenshotObserver();
         scheduleScreenshotScan();''','start screenshot watch on input focus')
 
-replace('''    public void onWindowHidden() {
-        if (translateMode()) closeTranslationPanel();''',
+replace('''    public void onWindowHidden() {''',
 '''    public void onWindowHidden() {
-        stopScreenshotObserver();
-        if (translateMode()) closeTranslationPanel();''','stop watcher when keyboard hides')
+        stopScreenshotObserver();''','stop watcher when keyboard hides')
 
-replace('''    public void onDestroy() {
-        if (translationPanel != null) translationPanel.dismiss();''',
+replace('''    public void onDestroy() {''',
 '''    public void onDestroy() {
-        stopScreenshotObserver();
-        if (translationPanel != null) translationPanel.dismiss();''','stop watcher on destroy')
+        stopScreenshotObserver();''','stop watcher on destroy')
 
 ime.write_text(s,encoding="utf-8")
 
