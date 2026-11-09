@@ -60,7 +60,7 @@ sub('''        for (String id : order[0]) toolbar.addView(toolButtonOf(id));
 sub('''        toolbar.setVisibility(panel == PANEL_SEARCH || !(on || suggesting) ? View.GONE : View.VISIBLE);''',
 '''        toolbar.setVisibility(panel == PANEL_SEARCH || !(on || suggesting) ? View.GONE : View.VISIBLE);
         if (translateQuickButton != null) {
-            translateQuickButton.setVisibility(on && !suggesting && !passwordField
+            translateQuickButton.setVisibility(on && !passwordField && !candidates
                     && panel == PANEL_KEYBOARD ? View.VISIBLE : View.GONE);
         }''','toolbar button visibility')
 
