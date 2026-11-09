@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   apk:
@@ -110,3 +110,19 @@ jobs:
           name: NewSwipe-Stable-build-source
           path: built/*.apk
           if-no-files-found: error
+
+      - name: Record successful artifact run id
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_RUN_ID" > /tmp/newswipe-stable-run.txt
+          content="$(base64 -w0 /tmp/newswipe-stable-run.txt)"
+          uri="repos/$GITHUB_REPOSITORY/contents/newswipe/last-stable-run.txt"
+          existing_sha="$(gh api "$uri" --jq '.sha' 2>/dev/null || true)"
+          if [ -n "$existing_sha" ]; then
+            gh api -X PUT "$uri" -f message="Record successful NewSwipe stable build" -f content="$content" -f sha="$existing_sha" -f branch="$GITHUB_REF_NAME" >/dev/null
+          else
+            gh api -X PUT "$uri" -f message="Record successful NewSwipe stable build" -f content="$content" -f branch="$GITHUB_REF_NAME" >/dev/null
+          fi
