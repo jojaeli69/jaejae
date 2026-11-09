@@ -159,7 +159,9 @@ replacement = '''    private void startExport(boolean withWords, boolean withEmo
     }
 '''
 # Python escapes: produce Java char literal '\\0' rather than '\\\\0'
-replacement = replacement.replace("'\\\\\\\\0'", "'\\\\0'")
+replacement = replacement.replace(chr(92) * 2 + '0', chr(92) + '0')
+assert "Arrays.fill(password, '" + chr(92) + "0');" in replacement
+assert chr(92) * 2 + '0' not in replacement
 src = src[:start] + replacement + src[end:]
 assert 'MediaStore.Downloads.EXTERNAL_CONTENT_URI' in src
 assert 'SettingsImport.onPicked(this, uri' in src
