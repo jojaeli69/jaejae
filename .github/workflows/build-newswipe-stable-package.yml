@@ -1,4 +1,4 @@
-name: Build NewSwipe stable installer for private signing
+name: Build NewSwipe stable release for private signing
 on:
   push:
     branches:
@@ -92,14 +92,14 @@ jobs:
           sed -i '/^networkTimeout=/d' gradle/wrapper/gradle-wrapper.properties
           printf '\nnetworkTimeout=120000\n' >> gradle/wrapper/gradle-wrapper.properties
           for attempt in 1 2 3; do
-            if ./gradlew --no-daemon assembleDebug; then
+            if ./gradlew --no-daemon assembleRelease; then
               break
             fi
             if [ "$attempt" -eq 3 ]; then exit 1; fi
             sleep 8
           done
           mkdir -p ../built
-          cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-Stable-TO-RESIGN.apk
+          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-Stable-TO-RESIGN.apk
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging ../built/NewSwipe-Stable-TO-RESIGN.apk | head -5
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-Stable-TO-RESIGN.apk
           sha256sum ../built/*.apk
