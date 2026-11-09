@@ -34,7 +34,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/TechTree-Alt/NewSwipe.git upstream-newswipe
+          git clone https://github.com/TechTree-Alt/NewSwipe.git upstream-newswipe
+          git -C upstream-newswipe checkout e0a07dc2a35012597c91c4a68c8059cdb74fb3af
           cat newswipe-payload.part{1..7} > /tmp/newswipe-complete.b64
           base64 -d /tmp/newswipe-complete.b64 > /tmp/newswipe-source.tar.gz
           echo "90686e3957d69de4649af6f8c778af3b7cd0c174df269955a5eda8ffef138778  /tmp/newswipe-source.tar.gz" | sha256sum -c -
