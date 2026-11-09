@@ -55,6 +55,7 @@ jobs:
           assert s.count("versionCode = 21") == 1
           assert s.count('versionName = "1.9.1"') == 1
           assert s.count("    buildTypes {\n        release {") == 1
+          s = s.replace("        versionCode = 21", "        ndk {\n            abiFilters.add(\"arm64-v8a\")\n        }\n        versionCode = 21")
           s = s.replace("versionCode = 21", "versionCode = 26")
           s = s.replace('versionName = "1.9.1"', 'versionName = "1.9.6-translate"')
           s = s.replace("    buildTypes {\n        release {", '    buildTypes {\n        debug {\n            applicationIdSuffix = ".translate"\n            versionNameSuffix = "-test"\n        }\n        release {')
