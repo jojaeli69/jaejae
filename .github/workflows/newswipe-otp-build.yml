@@ -67,7 +67,15 @@ jobs:
           Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
           Path("app/src/debug/res/values/strings.xml").write_text('<resources><string name="app_name">NewSwipe 번역수정</string></resources>\n')
           PY
-          ./gradlew --no-daemon assembleDebug assembleRelease
+          sed -i '/^networkTimeout=/d' gradle/wrapper/gradle-wrapper.properties
+          printf '\nnetworkTimeout=120000\n' >> gradle/wrapper/gradle-wrapper.properties
+          for attempt in 1 2 3; do
+            if ./gradlew --no-daemon assembleDebug assembleRelease; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep 8
+          done
           mkdir -p ../built
           cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-v200-TEST.apk
           cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-v200-REPLACE.apk
