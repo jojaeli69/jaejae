@@ -34,30 +34,18 @@ replace('''    private String lastRecentScreenshotKey;''',
     private final Runnable screenshotScanRunnable = this::checkRecentScreenshot;''',
 'visible-only content observer fields')
 
-replace('''private void checkRecentScreenshot() {
-        if (!prefs.clipboardChip() || !RecentScreenshot.allowed(this)
-                || panel!=PANEL_KEYBOARD || passwordField || quickImageReady()) return;''',
-'''    private void checkRecentScreenshot() {
-        if (!prefs.clipboardChip() || !RecentScreenshot.allowed(this)
-                || panel!=PANEL_KEYBOARD || passwordField || windowHidden) return;''',
+replace('''|| panel!=PANEL_KEYBOARD || passwordField || quickImageReady()) return;''',
+'''|| panel!=PANEL_KEYBOARD || passwordField || windowHidden) return;''',
 'do not skip newer screenshot when photo chip holds old content')
 
-replace('''                if (r==null || gen!=pasteInputGeneration || panel!=PANEL_KEYBOARD
-                        || passwordField || windowHidden || quickImageReady()) return;
-                String marker=r.uri.toString();
-                if (marker.equals(lastRecentScreenshotKey)) return;
-                lastRecentScreenshotKey=marker;
-                offerQuickImage(r.uri,r.mime,true);''',
-'''                if (r==null || gen!=pasteInputGeneration || panel!=PANEL_KEYBOARD
-                        || passwordField || windowHidden) return;
-                String marker=r.uri.toString();
-                if (marker.equals(lastRecentScreenshotKey)) return;
-                // A newer user-copied image should take priority over an older screenshot.
-                if (quickImageReady() && !quickImageFromScreenshot
+replace('''|| passwordField || windowHidden || quickImageReady()) return;''',
+'''|| passwordField || windowHidden) return;''',
+'allow new screenshot to update old chip')
+replace('''lastRecentScreenshotKey=marker;''',
+'''if (quickImageReady() && !quickImageFromScreenshot
                         && quickImageCopiedAt > r.captured + 1000L) return;
-                lastRecentScreenshotKey=marker;
-                offerQuickImage(r.uri,r.mime,true);''',
-'allow newer screenshot replace old photo chip')
+                lastRecentScreenshotKey=marker;''',
+'prefer recent copied image over older screenshot')
 
 # Monitor gallery saves only when keyboard is showing and the user has granted
 # full image access. No persistent background service and no broad media polling.
