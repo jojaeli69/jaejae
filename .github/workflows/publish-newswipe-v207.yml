@@ -1,0 +1,46 @@
+name: Publish NewSwipe v2.0.7 50 entries 120 hours APK
+on:
+  push:
+    branches:
+      - build-newswipe-clipboard-50-120h-v207-20261109
+    paths:
+      - .github/workflows/publish-newswipe-v207.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify existing APK build and package ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          gh run download 42603518253 --repo ${{ github.repository }} --name NewSwipe-v207-apks --dir release
+          test -s release/NewSwipe-v207-TEST.apk
+          cp release/NewSwipe-v207-TEST.apk release/NewSwipe-v2.0.7.apk
+          echo "b5eb8dda0521380fc35246586b35bbc2d0d9ed016e340242688ca062a46bbb58  release/NewSwipe-v2.0.7.apk" | sha256sum -c -
+          (cd release && zip -9 -j NewSwipe-v2.0.7-install.zip NewSwipe-v2.0.7.apk)
+          unzip -t release/NewSwipe-v2.0.7-install.zip
+          sha256sum release/NewSwipe-v2.0.7*
+      - name: Publish stable public downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "NewSwipe-v2.0.7-20261109" \
+            release/NewSwipe-v2.0.7.apk release/NewSwipe-v2.0.7-install.zip \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "NewSwipe v2.0.7 · 클립보드 50개 / 120시간 보관" \
+            --notes "총 50개(고정 포함) 저장, 고정하지 않은 클립보드 기록은 120시간(5일) 뒤 삭제, 기존 5개 이미지 제한과 10개 고정 제한 유지. v2.0.6의 컴팩트 클립보드 UI 및 기존 번역/오타 학습/캡처 감지 코드를 유지합니다. 별도 설치 시험판이며 기존 설치 앱의 클립보드 기록은 자동 이전되지 않습니다. Android 빌드, APK 서명, Java 보관 정책 테스트 통과; Galaxy S25 실기기 미검증." \
+            --latest=false
+          gh release view "NewSwipe-v2.0.7-20261109" --repo "${{ github.repository }}" --json url,assets
