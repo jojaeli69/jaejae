@@ -18,14 +18,12 @@ replace_manifest('''<uses-permission android:name="android.permission.RECEIVE_SM
          place freshly captured screenshots on the system clipboard. -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />''')
-replace_manifest('''        <activity
-            android:name=".SmsDirectSetupActivity"''',
-'''        <activity
+replace_manifest('''</application>''',
+'''    <activity
             android:name=".ScreenshotAccessActivity"
             android:exported="false"
             android:label="최근 캡처 사진 접근" />
-        <activity
-            android:name=".SmsDirectSetupActivity"''')
+    </application>''')
 manifest.write_text(s,encoding="utf-8")
 
 settings=src/"SettingsActivity.java"
