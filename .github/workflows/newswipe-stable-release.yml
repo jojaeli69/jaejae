@@ -1,5 +1,8 @@
 name: NewSwipe stable in-place update signing
 on:
+  push:
+    branches:
+      - newswipe-stable-updates-20261109
   workflow_dispatch:
 
 permissions:
