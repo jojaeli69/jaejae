@@ -106,11 +106,9 @@ sub('''    public void onFinishInput() {''',
         closeTranslationPanel();
         translationInputGeneration++;''','input end')
 
-sub('''    public void onDestroy() {
-        if (clipboard != null) clipboard.removePrimaryClipChangedListener(this);''',
+sub('''    public void onDestroy() {''',
 '''    public void onDestroy() {
-        if (translationPanel != null) translationPanel.dismiss();
-        if (clipboard != null) clipboard.removePrimaryClipChangedListener(this);''','destroy')
+        if (translationPanel != null) translationPanel.dismiss();''','destroy')
 
 needle='''    /** 텍스트를 커서 자리에 붙여 넣는다 (키를 누르는 소리·진동은 부르는 쪽이 정한다). */'''
 assert s.count(needle)==1
