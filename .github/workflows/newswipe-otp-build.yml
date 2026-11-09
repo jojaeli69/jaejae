@@ -1,8 +1,8 @@
-name: NewSwipe screenshot clipboard and recent gallery paste repair
+name: NewSwipe live screenshot detection and compact toolbar
 on:
   push:
     branches:
-      - build-newswipe-screenshot-paste-v204-20261109
+      - build-newswipe-live-screenshot-v205-20261109
   workflow_dispatch:
 
 permissions:
@@ -61,6 +61,7 @@ jobs:
           java -cp /tmp/newswipe-touch-test com.alternative_studios.newswipe.keyboard.TouchBiasMathTest
           python3 ../newswipe/polish_translate_ui_v203.py
           python3 ../newswipe/patch_screenshot_paste_v204.py
+          python3 ../newswipe/fix_live_screenshot_v205.py
           python3 - <<'PY'
           from pathlib import Path
           p = Path("app/build.gradle.kts")
@@ -69,12 +70,12 @@ jobs:
           assert s.count('versionName = "1.9.1"') == 1
           assert s.count("    buildTypes {\n        release {") == 1
           s = s.replace("        versionCode = 21", "        ndk {\n            abiFilters.add(\"arm64-v8a\")\n        }\n        versionCode = 21")
-          s = s.replace("versionCode = 21", "versionCode = 34")
-          s = s.replace('versionName = "1.9.1"', 'versionName = "2.0.4-photo-paste"')
-          s = s.replace("    buildTypes {\n        release {", '    buildTypes {\n        debug {\n            applicationIdSuffix = ".photopaste"\n            versionNameSuffix = "-test"\n        }\n        release {')
+          s = s.replace("versionCode = 21", "versionCode = 35")
+          s = s.replace('versionName = "1.9.1"', 'versionName = "2.0.5-live-shot"')
+          s = s.replace("    buildTypes {\n        release {", '    buildTypes {\n        debug {\n            applicationIdSuffix = ".liveshot"\n            versionNameSuffix = "-test"\n        }\n        release {')
           p.write_text(s)
           Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
-          Path("app/src/debug/res/values/strings.xml").write_text('<resources><string name="app_name">NewSwipe 사진붙여넣기</string></resources>\n')
+          Path("app/src/debug/res/values/strings.xml").write_text('<resources><string name="app_name">NewSwipe 캡처수정</string></resources>\n')
           PY
           sed -i '/^networkTimeout=/d' gradle/wrapper/gradle-wrapper.properties
           printf '\nnetworkTimeout=120000\n' >> gradle/wrapper/gradle-wrapper.properties
@@ -86,15 +87,15 @@ jobs:
             sleep 8
           done
           mkdir -p ../built
-          cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-v204-TEST.apk
-          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-v204-REPLACE.apk
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging ../built/NewSwipe-v204-TEST.apk | head -5
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-v204-TEST.apk
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-v204-REPLACE.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../built/NewSwipe-v205-TEST.apk
+          cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-v205-REPLACE.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging ../built/NewSwipe-v205-TEST.apk | head -5
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-v205-TEST.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-v205-REPLACE.apk
           sha256sum ../built/*.apk
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: NewSwipe-v204-apks
+          name: NewSwipe-v205-apks
           path: built/*.apk
           if-no-files-found: error
