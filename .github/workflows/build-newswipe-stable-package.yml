@@ -1,4 +1,4 @@
-name: Build NewSwipe stable release for private signing
+name: Build NewSwipe stable release for private signing (2.1.2 retry)
 on:
   push:
     branches:
