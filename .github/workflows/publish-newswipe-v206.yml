@@ -1,0 +1,46 @@
+name: Publish NewSwipe v2.0.6 compact clipboard APK
+on:
+  push:
+    branches:
+      - build-newswipe-compact-clipboard-v206-20261109
+    paths:
+      - .github/workflows/publish-newswipe-v206.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify built APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          gh run download 42598275208 --repo ${{ github.repository }} --name NewSwipe-v206-apks --dir release
+          test -s release/NewSwipe-v206-TEST.apk
+          cp release/NewSwipe-v206-TEST.apk release/NewSwipe-v2.0.6.apk
+          echo "be51c3a90ec6236d58abb96a72ec912df3d20ade0f244dce5722e2f72bde0a5d  release/NewSwipe-v2.0.6.apk" | sha256sum -c -
+          (cd release && zip -9 -j NewSwipe-v2.0.6-install.zip NewSwipe-v2.0.6.apk)
+          unzip -t release/NewSwipe-v2.0.6-install.zip
+          sha256sum release/NewSwipe-v2.0.6*
+      - name: Publish stable APK and ZIP URLs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "NewSwipe-v2.0.6-20261109" \
+            release/NewSwipe-v2.0.6.apk release/NewSwipe-v2.0.6-install.zip \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "NewSwipe v2.0.6 · 작은 클립보드 카드 UI" \
+            --notes "클립보드 카드 높이 축소, 본문 12.3sp/2줄, 작은 사진 썸네일·고정·삭제 아이콘, 카드 간격 4dp, 항목 수 표시, 길게 누르기 미리보기. 기존 번역·오타 학습·스페이스바 커서 이동·캡처 감지 코드를 유지한 별도 설치 시험판입니다. Galaxy S25 실기기 테스트는 아직 하지 않았습니다." \
+            --latest=false
+          gh release view "NewSwipe-v2.0.6-20261109" --repo "${{ github.repository }}" --json url,assets
