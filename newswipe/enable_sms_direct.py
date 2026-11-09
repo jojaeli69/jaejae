@@ -152,8 +152,10 @@ manifest.write_text(s,encoding="utf-8")
 prefs=pkg/"Prefs.java"
 s=prefs.read_text(encoding="utf-8")
 old='public boolean smsOtpConsent() { return sp.getBoolean(SMS_OTP_CONSENT, false); }'
-assert s.count(old)==1
-s=s.replace(old,'public boolean smsOtpConsent() { return sp.getBoolean(SMS_OTP_CONSENT, true); }',1)
+if s.count(old)==1:
+    s=s.replace(old,'public boolean smsOtpConsent() { return sp.getBoolean(SMS_OTP_CONSENT, true); }',1)
+else:
+    assert 'getBoolean(SMS_OTP_CONSENT, true)' in s, "OTP default should already be enabled"
 prefs.write_text(s,encoding="utf-8")
 
 ime=pkg/"NewSwipeIME.java"
