@@ -39,6 +39,7 @@ public final class KeyboardTranslatePanel extends LinearLayout {
     private final Button translateButton, replaceButton, insertButton;
     private String original = "";
     private boolean originallySelected;
+    private boolean fromClipboard;
     private String result = null;
     private int requestId;
     private Translator translator;
@@ -167,6 +168,7 @@ public final class KeyboardTranslatePanel extends LinearLayout {
     public void showSource(String text, boolean selected) {
         original = text == null ? "" : text;
         originallySelected = selected;
+        fromClipboard = false;
         result = null;
         requestId++;
         closeTranslator();
@@ -195,7 +197,8 @@ public final class KeyboardTranslatePanel extends LinearLayout {
                 return;
             }
             CharSequence text = clip.getItemAt(0).getText();
-            showSource(text.length() > 500 ? text.subSequence(0, 500).toString() : text.toString(), false);
+            showSource(text.length() > 350 ? text.subSequence(0, 350).toString() : text.toString(), false);
+            fromClipboard = true;
             status.setText("클립보드의 글을 번역했습니다. 원문 교체는 사용할 수 없습니다.");
             replaceButton.setEnabled(false);
         } catch (RuntimeException ex) {
@@ -204,7 +207,7 @@ public final class KeyboardTranslatePanel extends LinearLayout {
     }
 
     private void resultActionsEnabled(boolean enabled) {
-        replaceButton.setEnabled(enabled && !original.trim().isEmpty());
+        replaceButton.setEnabled(enabled && !original.trim().isEmpty() && !fromClipboard);
         insertButton.setEnabled(enabled);
     }
 
