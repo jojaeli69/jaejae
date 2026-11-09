@@ -3,8 +3,6 @@ on:
   push:
     branches:
       - newswipe-stable-updates-20261109
-    paths:
-      - .github/workflows/build-newswipe-stable-package.yml
   workflow_dispatch:
 
 permissions:
