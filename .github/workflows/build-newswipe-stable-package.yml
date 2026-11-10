@@ -4,6 +4,9 @@ on:
     branches:
       - newswipe-stable-updates-20261109
   workflow_dispatch:
+  pull_request:
+    branches:
+      - newswipe-stable-updates-20261109
 
 permissions:
   contents: write
@@ -15,6 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Record active build ID for diagnostics
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -129,7 +133,7 @@ jobs:
           if-no-files-found: error
 
       - name: Record successful artifact run id
-        if: success()
+        if: github.event_name == 'push' && success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
