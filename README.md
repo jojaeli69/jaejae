@@ -1,7 +1,10 @@
-# QuietRings GTS4 Mini preview install
+# QuietRings GTS 4 Mini – Dialog v1.1
 
-This branch hosts a personal 336x384 Zepp OS watchface ZPK for installation testing via the Zepp App developer-mode QR scanner.
+Corrected GTS 4 Mini Zepp OS 1.0 watchface preview.
 
-Warning: unofficial repackaged Zepp OS 1.0 preview package; NOT Zeus-compiled or tested on physical GTS 4 Mini hardware. Installation and widgets are unverified. No credentials or personal data included.
+- GTS4 Mini deviceSources: 246/247, 336 x 384, Dialog platform
+- Re-encoded all raster assets from the older NXP output into Dialog encoding (BGRA palette, no 16-pixel row padding)
+- This is an unofficial experimental ZPK; real-watch rendering and sensor values must be rechecked.
+- Previous v1.0 had corrupted stripes and swapped red/blue due to NXP image encoding – do not use.
 
-Watchface QR URL uses watchface://raw.githubusercontent.com/.../QuietRings_GTS4Mini_QR_PREVIEW.zpk
+Install QR payload should reference watchface://raw.githubusercontent.com/.../QuietRings_GTS4Mini_DIALOG_v1.1.zpk
