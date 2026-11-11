@@ -1,0 +1,15 @@
+plugins { id 'com.android.application' }
+android {
+ namespace 'dev.gts4.rebootprobe'
+ compileSdk 35
+ defaultConfig {
+  applicationId 'dev.gts4mini.chargeprobe'
+  minSdk 26
+  targetSdk 35
+  versionCode 1
+  versionName '1.0.0'
+ }
+ compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+
+dependencies { implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1' }
