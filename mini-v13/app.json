@@ -5,11 +5,11 @@
     "appName": "Mini BatteryLink",
     "appType": "app",
     "version": {
-      "code": 3,
-      "name": "1.3.0"
+      "code": 4,
+      "name": "1.4.0"
     },
     "vender": "Personal Project",
-    "description": "Zepp OS 1.0 BLE diagnostics and Mini battery relay",
+    "description": "GTS 4 Mini official Zepp OS 1.0 MessageBuilder bridge",
     "icon": "icon.png"
   },
   "runtime": {
