@@ -128,8 +128,8 @@ def patch_coordinator(s):
     # flag and a capabilities response. This diagnostic build keeps the Alexa
     # screen available even when capabilities have not yet been negotiated.
     return replace_once(s,
-        "        if (supportsAlexa(device)) {\\n            developer.add(R.xml.devicesettings_huami2021_alexa);\\n        }",
-        "        // Diagnostic only: always show Alexa settings for opt-in BLE voice test.\\n        developer.add(R.xml.devicesettings_huami2021_alexa);")
+        "        if (supportsAlexa(device)) {\n            developer.add(R.xml.devicesettings_huami2021_alexa);\n        }",
+        "        // Diagnostic only: always show Alexa settings for opt-in BLE voice test.\n        developer.add(R.xml.devicesettings_huami2021_alexa);")
 
 
 def patch_customizer(s):
@@ -137,7 +137,7 @@ def patch_customizer(s):
     # new button appears but does nothing.
     return replace_once(s,
         '                handler.findPreference("zepp_os_alexa_btn_trigger"),',
-        '                handler.findPreference("zepp_os_alexa_btn_capture_once"),\\n'
+        '                handler.findPreference("zepp_os_alexa_btn_capture_once"),\n'
         '                handler.findPreference("zepp_os_alexa_btn_trigger"),')
 
 
