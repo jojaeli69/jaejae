@@ -65,32 +65,32 @@ jobs:
                   original=z.read(file)
                   with ZipFile(io.BytesIO(original)) as inner:
                       meta=json.loads(inner.read('app.json').decode())
-                  assert meta['app']['appId']==90002611 and meta['app']['version']['code']==6
+                  assert meta['app']['appId']==90002611 and meta['app']['version']['code']==7
                   meta.setdefault('packageInfo',{})['mode']='preview'
                   meta['packageInfo']['expiredTime']=604800
                   outer[file]=rezip(original,{'app.json':json.dumps(meta,separators=(',',':')).encode()})
           result=rezip(binary,outer)
-          target=Path('GTS4Mini_BatteryLink_v1_6_AutoSync_Preview.zpk')
+          target=Path('GTS4Mini_BatteryLink_v1_7_WidgetAck_Preview.zpk')
           target.write_bytes(result)
           with ZipFile(target) as z:
               for name in ['device.zip','app-side.zip']:
                   with ZipFile(io.BytesIO(z.read(name))) as inner:
                       meta=json.loads(inner.read('app.json'))
                       assert meta['packageInfo']['mode']=='preview'
-                      assert meta['app']['version']['code']==6
+                      assert meta['app']['version']['code']==7
           print('VERIFIED',target,len(result),hashlib.sha256(result).hexdigest())
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: GTS4Mini-v1-6-AutoSync-Preview
-          path: GTS4Mini_BatteryLink_v1_6_AutoSync_Preview.zpk
+          name: GTS4Mini-v1-7-WidgetAck-Preview
+          path: GTS4Mini_BatteryLink_v1_7_WidgetAck_Preview.zpk
           if-no-files-found: error
       - name: Publish to public branch for QR install
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add GTS4Mini_BatteryLink_v1_6_AutoSync_Preview.zpk
+          git add GTS4Mini_BatteryLink_v1_7_WidgetAck_Preview.zpk
           if ! git diff --cached --quiet; then
-            git commit -m "Publish Zepp v1.6 Auto Sync ZPK [skip ci]"
+            git commit -m "Publish Zepp v1.7 Widget ACK ZPK [skip ci]"
             git push origin HEAD:gts4mini-batterylink-v13
           fi
