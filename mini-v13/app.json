@@ -5,11 +5,11 @@
     "appName": "Mini BatteryLink",
     "appType": "app",
     "version": {
-      "code": 6,
-      "name": "1.6.0"
+      "code": 7,
+      "name": "1.7.0"
     },
     "vender": "Personal Project",
-    "description": "Zepp OS 1.0 battery event and 30s poll, auto report to verified Battery Trio v66",
+    "description": "Zepp OS 1.0 battery auto updates with Android home widget publish confirmation",
     "icon": "icon.png"
   },
   "runtime": {
