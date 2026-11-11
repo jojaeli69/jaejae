@@ -1,0 +1,40 @@
+name: Publish Battery Trio v68 BLE Probe APK
+on:
+  push:
+    branches: [gts4mini-batterylink-v13]
+    paths:
+      - '_dist/BatteryTrioMini_v68.apk.b64'
+      - '.github/workflows/publish-batterytrio-v68.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gts4mini-batterylink-v13
+      - name: Decode and verify v68 Android APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p downloads
+          base64 -d _dist/BatteryTrioMini_v68.apk.b64 > downloads/BatteryTrioMini_v68.apk
+          echo '39702121528dd6c855521703c8c74a5a4edd158a9f9b2cf5902d5e2770ce52cb  downloads/BatteryTrioMini_v68.apk' | sha256sum -c -
+          unzip -t downloads/BatteryTrioMini_v68.apk >/dev/null
+          unzip -Z1 downloads/BatteryTrioMini_v68.apk | grep -qx AndroidManifest.xml
+          test "$(stat -c %s downloads/BatteryTrioMini_v68.apk)" -eq 86690
+          echo 'Verified Battery Trio Mini v68 APK integrity: 86690 bytes'
+      - name: Publish direct APK in GitHub branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/BatteryTrioMini_v68.apk
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish verified Battery Trio Mini v68 read-only BLE probe [skip ci]'
+            git push origin HEAD:gts4mini-batterylink-v13
+          fi
