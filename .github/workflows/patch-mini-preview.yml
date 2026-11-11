@@ -1,0 +1,64 @@
+name: Publish verified GTS4 Mini preview package
+on:
+  push:
+    branches:
+      - gts4mini-batterylink-v1
+    paths:
+      - '.github/workflows/patch-mini-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  repack-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gts4mini-batterylink-v1
+          persist-credentials: true
+      - name: Repack production as real preview package
+        run: |
+          python3 - <<'PY'
+          from zipfile import ZipFile,ZIP_DEFLATED
+          from pathlib import Path
+          import io,json,hashlib
+          source=Path("GTS4Mini_BatteryLink_v1_Official.zpk")
+          def patch(content, replacements):
+              b=io.BytesIO()
+              with ZipFile(io.BytesIO(content)) as r, ZipFile(b,'w',ZIP_DEFLATED) as w:
+                  for f in r.infolist():
+                      w.writestr(f.filename,replacements.get(f.filename,r.read(f.filename)))
+              return b.getvalue()
+          s=source.read_bytes()
+          with ZipFile(io.BytesIO(s)) as z:
+              entries={n:z.read(n) for n in z.namelist()}
+          for n in ('device.zip','app-side.zip'):
+              with ZipFile(io.BytesIO(entries[n])) as inner:
+                  cfg=json.loads(inner.read('app.json'))
+                  assert cfg['packageInfo']['mode'] in ('production','preview')
+                  cfg['packageInfo']['mode']='preview'
+                  cfg['packageInfo']['expiredTime']=604800
+                  raw=json.dumps(cfg,separators=(',',':')).encode()
+              entries[n]=patch(entries[n],{'app.json':raw})
+          final=patch(s,entries)
+          zpk=Path('GTS4Mini_BatteryLink_v1_2_Preview.zpk')
+          zpk.write_bytes(final)
+          md5=hashlib.md5(final).hexdigest()
+          manifest={'configVersion':'v2','zpks':[{'name':md5+'.zpk','version':{'code':1,'name':'1.0.0'},'appType':'app','platforms':[{'screenType':'square','screenResolution':'336x384','cpuPlatform':'DIALOG'}],'md5':md5}],'bundleInfo':{'zpm':'3.5.0'}}
+          with ZipFile('GTS4Mini_BatteryLink_v1_2_Preview.zab','w',ZIP_DEFLATED) as z:
+              z.writestr(md5+'.zpk',final)
+              z.writestr('manifest.json',json.dumps(manifest,separators=(',',':')))
+          with ZipFile(zpk) as z:
+              for n in ('device.zip','app-side.zip'):
+                  with ZipFile(io.BytesIO(z.read(n))) as inner:
+                      assert json.loads(inner.read('app.json'))['packageInfo']['mode']=='preview'
+          assert len(final)>4000
+          print('PREVIEW VERIFIED',len(final),hashlib.sha256(final).hexdigest())
+          PY
+      - name: Publish preview install files to public branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add GTS4Mini_BatteryLink_v1_2_Preview.zpk GTS4Mini_BatteryLink_v1_2_Preview.zab
+          git commit -m 'Publish Mini preview ZPK for Zepp QR [skip ci]'
+          git push origin HEAD:gts4mini-batterylink-v1
