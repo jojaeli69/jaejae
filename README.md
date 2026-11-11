@@ -1,18 +1,18 @@
-# QuietRings GTS 4 Mini preview builds
+# QuietRings GTS4 Mini experimental QR builds
 
-Latest: **v1.6** — `QuietRings_GTS4Mini_DIALOG_v1.6.zpk`
+Latest: **v1.7** (`QuietRings_GTS4Mini_DIALOG_v1.7.zpk`)
 
-### Main fix
-Normal watchface previously created 4 independent IMG widgets and positioned each time digit with JavaScript. AOD already uses the native Zepp `IMG_TIME` widget. v1.6 converts normal time to one native `IMG_TIME` widget as well and proportionally resizes only the 10 normal time digits from 85×140 to 78×126 in native Dialog format. AOD widget & assets are unchanged, Wednesday/date/rings/metrics unchanged. Vertical gap 13px.
+## AOD and normal visual size unified
+- GTS 4 Mini 336x384, Zepp OS 1.0, Dialog native image assets
+- Normal clock: same v1.6 assets, logic and positions (78x126 per digit)
+- AOD clock resized from 85x140 to 78x126 per digit, retaining subdued AOD gray color palette
+- AOD `IMG_TIME` positions now match normal `IMG_TIME`: hour x159/y83, minute x159/y222, digit spacing 2px
+- Original normal screen/date/Wednesday and ring positions, plus event/polling behavior, unchanged
+- All 10 AOD native Dialog TGA images re-encoded and decoded successfully
+- 1,440 time configurations checked geometrically, both JS versions syntax validated, nested ZIP integrity verified
+- Unofficial experimental ZPK; actual GTS4 Mini AOD transition and brightness **not yet hardware-tested**
 
-### Verification
-- Decoded and re-encoded all 10 resized Dialog assets; correct 78×126 native header/palette and transparent borders
-- 1,440 clock value layouts geometrically checked
-- Actual compressed watchface JS executed in a Zepp-like mock with normal and AOD native widgets; lifecycle and sensors checked
-- ZPK ZIP integrity and preserved AOD resource binary equality verified
-- **Real GTS 4 Mini v1.6 on-device rendering not yet verified**
+Zepp Developer Mode QR URL:
+`watchface://raw.githubusercontent.com/jojaeli69/jaejae/quierrings-gts4mini-qr-test-20261111/QuietRings_GTS4Mini_DIALOG_v1.7.zpk`
 
-QR test URL:
-`watchface://raw.githubusercontent.com/jojaeli69/jaejae/quierrings-gts4mini-qr-test-20261111/QuietRings_GTS4Mini_DIALOG_v1.6.zpk`
-
-Older v1.1–v1.5 ZPKs remain available for rollback.
+Previous v1.1–v1.6 builds retained for rollback.
