@@ -5,11 +5,11 @@
     "appName": "Mini BatteryLink",
     "appType": "app",
     "version": {
-      "code": 4,
-      "name": "1.4.0"
+      "code": 5,
+      "name": "1.5.0"
     },
     "vender": "Personal Project",
-    "description": "GTS 4 Mini official Zepp OS 1.0 MessageBuilder bridge",
+    "description": "GTS 4 Mini battery percent change event and trend reporting via Zepp 1.0",
     "icon": "icon.png"
   },
   "runtime": {
