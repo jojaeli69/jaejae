@@ -32,13 +32,16 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - name: Verify runner Android SDK and install Android 34
+      - name: Inspect preinstalled Android SDK (no deprecated sdkmanager)
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          which sdkmanager
-          sdkmanager --version
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          ls -lah "$ANDROID_HOME" || true
+          ls "$ANDROID_HOME/platforms/" || true
+          ls "$ANDROID_HOME/build-tools/" || true
+          if [ ! -f "$ANDROID_HOME/platforms/android-34/android.jar" ]; then
+            echo "::error::Android API 34 platform absent on runner"
+            exit 1
+          fi
       - name: Clone a fixed upstream Gadgetbridge commit (AGPL-3.0)
         run: |
           git clone --depth 1 --branch master https://github.com/Freeyourgadget/Gadgetbridge.git upstream
