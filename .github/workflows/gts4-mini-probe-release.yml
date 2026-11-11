@@ -70,7 +70,7 @@ jobs:
           from pathlib import Path
           root=Path('gts4-mini-public')
           source=root/'GTS4Mini_MicProbe_Official.zpk'
-          target=root/'GTS4Mini_MicProbe_PREVIEW_v03.zpk'
+          target=root/'GTS4Mini_MicProbe_PREVIEW_v04.zpk'
           patches=[]
           def rewrite_zip(data, callback):
               buf=io.BytesIO()
@@ -102,7 +102,7 @@ jobs:
         run: |
           git config user.name 'GTS4 Mini Build Bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add gts4-mini-public/GTS4Mini_MicProbe_Official.zab gts4-mini-public/GTS4Mini_MicProbe_Official.zpk gts4-mini-public/GTS4Mini_MicProbe_PREVIEW_v03.zpk
+          git add gts4-mini-public/GTS4Mini_MicProbe_Official.zab gts4-mini-public/GTS4Mini_MicProbe_Official.zpk gts4-mini-public/GTS4Mini_MicProbe_PREVIEW_v04.zpk
           if git diff --cached --quiet; then
             echo "Compiled package unchanged."
           else
@@ -113,6 +113,6 @@ jobs:
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: gts4-mini-probe-v03-official-preview-package
+          name: gts4-mini-probe-v04-official-preview-package
           path: gts4-mini-public/*
           if-no-files-found: error
