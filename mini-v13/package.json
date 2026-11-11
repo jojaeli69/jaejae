@@ -1,0 +1,11 @@
+{
+  "name": "gts4mini-batterylink",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build": "zeus build",
+    "preview": "zeus preview"
+  }
+}
