@@ -5,11 +5,11 @@
     "appName": "Mini Mic Probe",
     "appType": "app",
     "version": {
-      "code": 3,
-      "name": "0.3.0"
+      "code": 4,
+      "name": "0.4.0"
     },
     "vender": "Personal",
-    "description": "Safe read-only sensor diagnostic. Native start/stop disabled after watch freeze.",
+    "description": "Safe GTS4mini probe with one-click OPEN+ADD and state check; native START/STOP disabled",
     "icon": "icon.png"
   },
   "runtime": {
