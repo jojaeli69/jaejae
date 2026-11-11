@@ -25,7 +25,7 @@ Page({
     this.bridge=getApp()._options.globalData.messageBuilder
     const level=this.batteryLevel()
     this.observed=level
-    hmUI.createWidget(hmUI.widget.TEXT,{x:14,y:29,w:308,h:54,text:'Mini BatteryLink v1.6',color:0xffffff,text_size:27,align_h:hmUI.align.CENTER_H})
+    hmUI.createWidget(hmUI.widget.TEXT,{x:14,y:29,w:308,h:54,text:'Mini BatteryLink v1.7',color:0xffffff,text_size:27,align_h:hmUI.align.CENTER_H})
     this.levelText=hmUI.createWidget(hmUI.widget.TEXT,{x:14,y:95,w:308,h:80,text:level<0?'--%':level+'%',color:0x70db9d,text_size:66,align_h:hmUI.align.CENTER_H})
     this.note=hmUI.createWidget(hmUI.widget.TEXT,{x:10,y:182,w:316,h:54,text:'AUTO CHANGE ACTIVE',color:0xd4e0e8,text_size:18,align_h:hmUI.align.CENTER_H})
     hmUI.createWidget(hmUI.widget.BUTTON,{x:22,y:244,w:292,h:52,text:'1 TEST ZEPP',normal_color:0x294d74,press_color:0x1b334d,color:0xffffff,text_size:23,radius:9,click_func:()=>this.ping()})
@@ -93,7 +93,12 @@ Page({
         else if(res&&res.ok===true&&res.step==='PHONE') {
           this.lastSent=payload.level
           this.retryPending=false
-          this.status('TRIO RECEIVED '+payload.level+'%')
+          if(res.widgetPublished===true && Number(res.widgetCount)>0)
+            this.status('WIDGET UPDATED '+payload.level+'%')
+          else if(Number(res.widgetCount)===0)
+            this.status('NO HOME WIDGET ('+payload.level+'%)')
+          else
+            this.status('TRIO SAVED; CHECK WIDGET')
         } else if(res&&res.step==='PHONE') {
           this.retryPending=true
           this.status(res.route==='wrong-app'?'MINI COMPANION CONFLICT':'PHONE RECEIVER OFF')
