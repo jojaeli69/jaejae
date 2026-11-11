@@ -1,0 +1,96 @@
+name: Build GTS4 Mini diagnostic preview QR release
+on:
+  push:
+    branches: [gts4mini-batterylink-v13]
+    paths:
+      - 'mini-v13/**'
+      - '.github/workflows/build-mini-v13.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gts4mini-batterylink-v13
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test wire protocol
+        working-directory: mini-v13
+        run: npm test
+      - name: Install Zeus CLI
+        run: npm install -g @zeppos/zeus-cli
+      - name: Create required icon resources
+        working-directory: mini-v13
+        run: |
+          python3 - <<'PY'
+          import os,struct,zlib
+          os.makedirs('assets/gts4mini',exist_ok=True)
+          w=h=80
+          def chunk(k,b):return struct.pack('>I',len(b))+k+b+struct.pack('>I',zlib.crc32(k+b)&0xffffffff)
+          raw=b''.join(b'\x00'+bytes([34,151,92,255])*w for _ in range(h))
+          png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(raw,9))+chunk(b'IEND',b'')
+          open('icon.png','wb').write(png)
+          open('assets/gts4mini/icon.png','wb').write(png)
+          PY
+      - name: Compile Zepp watch and Side Service
+        working-directory: mini-v13
+        run: zeus build
+      - name: Produce isolated install-preview ZPK
+        run: |
+          python3 - <<'PY'
+          from zipfile import ZipFile, ZIP_DEFLATED
+          from pathlib import Path
+          import io,json,hashlib
+          dist=Path('mini-v13/dist')
+          zab=next(iter(dist.rglob('*.zab')),None)
+          assert zab, f'No .zab in {list(dist.rglob("*"))}'
+          with ZipFile(zab) as z:
+              names=[n for n in z.namelist() if n.endswith('.zpk')]
+              assert names, 'No ZPK in official .zab'
+              binary=z.read(names[0])
+          def rezip(blob,replacements):
+              output=io.BytesIO()
+              with ZipFile(io.BytesIO(blob)) as z, ZipFile(output,'w',ZIP_DEFLATED) as new:
+                  for info in z.infolist():
+                      new.writestr(info.filename,replacements.get(info.filename,z.read(info.filename)))
+              return output.getvalue()
+          outer={}
+          with ZipFile(io.BytesIO(binary)) as z:
+              for file in ['device.zip','app-side.zip']:
+                  original=z.read(file)
+                  with ZipFile(io.BytesIO(original)) as inner:
+                      meta=json.loads(inner.read('app.json').decode())
+                  assert meta['app']['appId']==90002611 and meta['app']['version']['code']==3
+                  meta.setdefault('packageInfo',{})['mode']='preview'
+                  meta['packageInfo']['expiredTime']=604800
+                  outer[file]=rezip(original,{'app.json':json.dumps(meta,separators=(',',':')).encode()})
+          result=rezip(binary,outer)
+          target=Path('GTS4Mini_BatteryLink_v1_3_Diag_Preview.zpk')
+          target.write_bytes(result)
+          with ZipFile(target) as z:
+              for name in ['device.zip','app-side.zip']:
+                  with ZipFile(io.BytesIO(z.read(name))) as inner:
+                      meta=json.loads(inner.read('app.json'))
+                      assert meta['packageInfo']['mode']=='preview'
+                      assert meta['app']['version']['code']==3
+          print('VERIFIED',target,len(result),hashlib.sha256(result).hexdigest())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GTS4Mini-v1-3-Diagnostic-Preview
+          path: GTS4Mini_BatteryLink_v1_3_Diag_Preview.zpk
+          if-no-files-found: error
+      - name: Publish to public branch for QR install
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add GTS4Mini_BatteryLink_v1_3_Diag_Preview.zpk
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish Zepp v1.3 diagnostics ZPK [skip ci]"
+            git push origin HEAD:gts4mini-batterylink-v13
+          fi
