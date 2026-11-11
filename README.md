@@ -1,18 +1,16 @@
-# QuietRings GTS4 Mini experimental QR builds
+# QuietRings GTS 4 Mini — experimental watchface QR releases
 
-Latest: **v1.7** (`QuietRings_GTS4Mini_DIALOG_v1.7.zpk`)
+Latest: **v1.8** (`QuietRings_GTS4Mini_DIALOG_v1.8.zpk`)
 
-## AOD and normal visual size unified
-- GTS 4 Mini 336x384, Zepp OS 1.0, Dialog native image assets
-- Normal clock: same v1.6 assets, logic and positions (78x126 per digit)
-- AOD clock resized from 85x140 to 78x126 per digit, retaining subdued AOD gray color palette
-- AOD `IMG_TIME` positions now match normal `IMG_TIME`: hour x159/y83, minute x159/y222, digit spacing 2px
-- Original normal screen/date/Wednesday and ring positions, plus event/polling behavior, unchanged
-- All 10 AOD native Dialog TGA images re-encoded and decoded successfully
-- 1,440 time configurations checked geometrically, both JS versions syntax validated, nested ZIP integrity verified
-- Unofficial experimental ZPK; actual GTS4 Mini AOD transition and brightness **not yet hardware-tested**
+### Why AOD looked misaligned even with matching 78×126 and identical coordinates
+- The v1.7 AOD digit art had been separately resized and differed from the normal screen's exact rasterized glyph masks (131–299 differing pixels per digit for an alpha threshold of 128).
+- v1.8 copies each normal digit's *exact* raster geometry and alpha data into its AOD counterpart, converting only the RGB palette to subdued gray (approximately 75/254).
+- Normal and AOD use the same Zepp OS IMG_TIME widget coordinates: hour (159,83), minute (159,222), 2px spacing. Same sizes 78×126.
+- Original normal glyphs, screen code, health widgets, AOD widget code and all other assets are unmodified, aside from app version metadata.
+- All 10 normal/AOD alpha masks match exactly; 1,440 valid time configurations checked; ZIPs verified.
+- **This does not rule out firmware-controlled AOD positional shift or burn-in mitigation. Actual GTS 4 Mini hardware test is still required.**
 
-Zepp Developer Mode QR URL:
-`watchface://raw.githubusercontent.com/jojaeli69/jaejae/quierrings-gts4mini-qr-test-20261111/QuietRings_GTS4Mini_DIALOG_v1.7.zpk`
+Install via Zepp developer-mode QR test:
+`watchface://raw.githubusercontent.com/jojaeli69/jaejae/quierrings-gts4mini-qr-test-20261111/QuietRings_GTS4Mini_DIALOG_v1.8.zpk`
 
-Previous v1.1–v1.6 builds retained for rollback.
+Previous v1.1–v1.7 builds retained for rollback.
