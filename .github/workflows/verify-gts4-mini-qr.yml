@@ -1,0 +1,23 @@
+name: Verify public Zepp QR install file
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/verify-gts4-mini-qr.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify anonymous ZPK download and ZIP integrity
+        run: |
+          set -euo pipefail
+          URL='https://raw.githubusercontent.com/jojaeli69/jaejae/codex/gts4-mini-probe-release/gts4-mini-public/GTS4Mini_MicProbe_Official.zpk'
+          curl --retry 2 --max-time 20 -fLsS -D headers.txt -o mic-probe.zpk "$URL"
+          printf 'Downloaded bytes: '
+          wc -c < mic-probe.zpk
+          unzip -t mic-probe.zpk
+          echo 'PUBLIC_ZPK_URL_OK'
