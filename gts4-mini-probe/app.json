@@ -5,11 +5,11 @@
     "appName": "Mini Mic Probe",
     "appType": "app",
     "version": {
-      "code": 1,
-      "name": "0.1.0"
+      "code": 2,
+      "name": "0.2.0"
     },
     "vender": "Personal",
-    "description": "GTS 4 mini mic permission diagnostic; no recording or firmware modification",
+    "description": "GTS 4 mini staged mic sensor diagnostic; does not capture or store audio",
     "icon": "icon.png"
   },
   "runtime": {
