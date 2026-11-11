@@ -15,7 +15,7 @@ jobs:
       - name: Verify anonymous ZPK download and ZIP integrity
         run: |
           set -euo pipefail
-          URL='https://raw.githubusercontent.com/jojaeli69/jaejae/codex/gts4-mini-probe-release/gts4-mini-public/GTS4Mini_MicProbe_PREVIEW_v03.zpk'
+          URL='https://raw.githubusercontent.com/jojaeli69/jaejae/codex/gts4-mini-probe-release/gts4-mini-public/GTS4Mini_MicProbe_PREVIEW_v04.zpk'
           curl --retry 2 --max-time 20 -fLsS -D headers.txt -o mic-probe.zpk "$URL"
           printf 'Downloaded bytes: '
           wc -c < mic-probe.zpk
@@ -28,7 +28,7 @@ jobs:
                   with zipfile.ZipFile(io.BytesIO(outer.read(nested))) as inner:
                       info=json.loads(inner.read('app.json'))['packageInfo']
                       assert info['mode']=='preview', (nested, info)
-                      assert int(__import__('json').loads(inner.read('app.json'))['app']['version']['code'])==3, (nested,'old-version')
+                      assert int(__import__('json').loads(inner.read('app.json'))['app']['version']['code'])==4, (nested,'old-version')
                       assert int(info['timeStamp'])+int(info['expiredTime'])>int(time.time()), (nested,'expired')
                       print(nested,info)
           print('VERIFIED_ANONYMOUS_PREVIEW_ZPK', len(raw), hashlib.sha256(raw).hexdigest())
