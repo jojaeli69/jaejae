@@ -1,15 +1,26 @@
 import {MessageBuilder} from '../shared/message'
 const builder=new MessageBuilder()
-function savedResponse(response){
-  if(!response)return false
+function receiveAck(response){
+  if(!response)return {ok:false,widgetCount:0,widgetPublished:false}
   let body=response.body
-  if(typeof body==='string'){try{body=JSON.parse(body)}catch(e){return false}}
-  if(body instanceof ArrayBuffer){try{
-    const b=new Uint8Array(body);let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);body=JSON.parse(s)
-  }catch(e){return false}}
+  if(typeof body==='string') {
+    try{body=JSON.parse(body)}catch(e){return {ok:false}}
+  }
+  if(body instanceof ArrayBuffer) {
+    try{
+      const bytes=new Uint8Array(body);let json=''
+      for(let i=0;i<bytes.length;i++)json+=String.fromCharCode(bytes[i])
+      body=JSON.parse(json)
+    }catch(e){return {ok:false}}
+  }
   if(body&&body.data&&body.stored===undefined)body=body.data
-  const code=Number(response.status||response.statusCode||response.code||200)
-  return code>=200&&code<300&&!!body&&body.stored===true&&body.receiver==='BatteryTrioMini'
+  const status=Number(response.status||response.statusCode||response.code||200)
+  const ok=status>=200&&status<300&&!!body&&body.stored===true&&body.receiver==='BatteryTrioMini'
+  return {
+    ok,
+    widgetCount:body?Math.max(0,Number(body.widget_count)||0):0,
+    widgetPublished:!!body&&body.widget_published===true
+  }
 }
 function sendToPhone(level,trend) {
   // ONLY the integrated Battery Trio is allowed to ACK. Never fall back
@@ -17,8 +28,9 @@ function sendToPhone(level,trend) {
   const validTrend=trend==='UP'||trend==='DOWN'?trend:'UNKNOWN'
   const url='http://127.0.0.1:18974/?postData=GTS4MINIBAT%3A'+level+'%3BTREND%3A'+validTrend+'%3B'
   return fetch({url,method:'GET'}).then(response=>{
-    if(savedResponse(response))return {ok:true,route:'trio-v66'}
-    console.log('BatteryTrio v66 did not ACK (wrong receiver or invalid response)')
+    const ack=receiveAck(response)
+    if(ack.ok)return {ok:true,route:'trio-v67',widgetCount:ack.widgetCount,widgetPublished:ack.widgetPublished}
+    console.log('BatteryTrio v67 did not ACK (wrong receiver or invalid response)')
     return {ok:false,route:'wrong-app'}
   }).catch(error=>{
     console.log('Battery Trio Mini receiver 18974 unavailable '+String(error))
@@ -27,7 +39,7 @@ function sendToPhone(level,trend) {
 }
 AppSideService({
   onInit() {
-    console.log('Mini side service v1.6 verified Trio receiver')
+    console.log('Mini side service v1.7 widget ACK')
     builder.listen(()=>{})
     builder.on('request',(ctx)=>{
       let req
