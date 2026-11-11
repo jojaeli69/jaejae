@@ -5,11 +5,11 @@
     "appName": "Mini BatteryLink",
     "appType": "app",
     "version": {
-      "code": 5,
-      "name": "1.5.0"
+      "code": 6,
+      "name": "1.6.0"
     },
     "vender": "Personal Project",
-    "description": "GTS 4 Mini battery percent change event and trend reporting via Zepp 1.0",
+    "description": "Zepp OS 1.0 battery event and 30s poll, auto report to verified Battery Trio v66",
     "icon": "icon.png"
   },
   "runtime": {
