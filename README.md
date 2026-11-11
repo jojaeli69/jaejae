@@ -1,16 +1,15 @@
-# QuietRings GTS 4 Mini — experimental watchface QR releases
+# QuietRings GTS 4 Mini — experimental Zepp QR builds
 
-Latest: **v1.8** (`QuietRings_GTS4Mini_DIALOG_v1.8.zpk`)
+Latest: **v1.9** — `QuietRings_GTS4Mini_DIALOG_v1.9.zpk`
 
-### Why AOD looked misaligned even with matching 78×126 and identical coordinates
-- The v1.7 AOD digit art had been separately resized and differed from the normal screen's exact rasterized glyph masks (131–299 differing pixels per digit for an alpha threshold of 128).
-- v1.8 copies each normal digit's *exact* raster geometry and alpha data into its AOD counterpart, converting only the RGB palette to subdued gray (approximately 75/254).
-- Normal and AOD use the same Zepp OS IMG_TIME widget coordinates: hour (159,83), minute (159,222), 2px spacing. Same sizes 78×126.
-- Original normal glyphs, screen code, health widgets, AOD widget code and all other assets are unmodified, aside from app version metadata.
-- All 10 normal/AOD alpha masks match exactly; 1,440 valid time configurations checked; ZIPs verified.
-- **This does not rule out firmware-controlled AOD positional shift or burn-in mitigation. Actual GTS 4 Mini hardware test is still required.**
+### Fix: irregular digit 5
+The v1.8 digit 5 was inherited from the v1.6 conversion and had undergone repeated downscaling. Its shoulder and lower curve looked less natural than the original. We re-rendered **only digit 5** from the original GTS4 source PNG (86×142) directly into the 78×126 Mini display size once, with high-quality sampling and Dialog-native TGA palette output.
 
-Install via Zepp developer-mode QR test:
-`watchface://raw.githubusercontent.com/jojaeli69/jaejae/quierrings-gts4mini-qr-test-20261111/QuietRings_GTS4Mini_DIALOG_v1.8.zpk`
+Both normal `t5.png` and AOD `a5.png` use the same raster alpha mask; AOD remains dark gray. All other numeric glyphs, coordinates, sensors, watchface JS, and AOD code are unchanged. Device app.json and app-side metadata have been incremented to version 1.9.0 (code 10).
 
-Previous v1.1–v1.7 builds retained for rollback.
+Validated: new normal/AOD alpha masks are identical, image round-trip through Dialog TGA, unchanged watchface JS, ZIP integrity and 12 representative number-5 time examples. **Not verified on actual GTS 4 Mini hardware yet**.
+
+Zepp developer mode experimental QR:
+`watchface://raw.githubusercontent.com/jojaeli69/jaejae/quierrings-gts4mini-qr-test-20261111/QuietRings_GTS4Mini_DIALOG_v1.9.zpk`
+
+Previous versions v1.1–v1.8 preserved for rollback.
