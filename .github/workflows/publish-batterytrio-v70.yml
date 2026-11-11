@@ -1,0 +1,40 @@
+name: Publish Battery Trio v70 Huami Charging APK
+on:
+  push:
+    branches: [gts4mini-batterylink-v13]
+    paths:
+      - '_dist/BatteryTrioMini_v70.apk.b64'
+      - '.github/workflows/publish-batterytrio-v70.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gts4mini-batterylink-v13
+      - name: Decode and verify v70 Android APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p downloads
+          base64 -d _dist/BatteryTrioMini_v70.apk.b64 > downloads/BatteryTrioMini_v70.apk
+          echo 'd48be2b6fd20499209ebdf443ca72ed9189327e1848f0fd94ae5cb42fcc30d1b  downloads/BatteryTrioMini_v70.apk' | sha256sum -c -
+          unzip -t downloads/BatteryTrioMini_v70.apk >/dev/null
+          unzip -Z1 downloads/BatteryTrioMini_v70.apk | grep -qx AndroidManifest.xml
+          test "$(stat -c %s downloads/BatteryTrioMini_v70.apk)" -eq 107172
+          echo 'Verified Battery Trio Mini v70 APK integrity: 107172 bytes'
+      - name: Publish direct APK in GitHub branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/BatteryTrioMini_v70.apk
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish verified Battery Trio Mini v70 automatic read-only BLE battery monitoring [skip ci]'
+            git push origin HEAD:gts4mini-batterylink-v13
+          fi
