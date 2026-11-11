@@ -9,28 +9,25 @@ function savedResponse(response){
   }catch(e){return false}}
   if(body&&body.data&&body.stored===undefined)body=body.data
   const code=Number(response.status||response.statusCode||response.code||200)
-  return code>=200&&code<300&&!!body&&body.stored===true
+  return code>=200&&code<300&&!!body&&body.stored===true&&body.receiver==='BatteryTrioMini'
 }
 function sendToPhone(level,trend) {
-  // Keep the existing BatteryLink app unchanged: use the separate Mini companion.
-  const ports=[18974,18973]
-  function next(i){
-    if(i>=ports.length)return Promise.resolve({ok:false,route:'none'})
-    const validTrend=trend==='UP'||trend==='DOWN'?trend:'UNKNOWN'
-    const url='http://127.0.0.1:'+ports[i]+'/?postData=GTS4MINIBAT%3A'+level+'%3BTREND%3A'+validTrend+'%3B'
-    return fetch({url,method:'GET'}).then(res=>{
-      if(savedResponse(res))return {ok:true,route:ports[i]===18974?'mini':'v45'}
-      return next(i+1)
-    }).catch(e=>{
-      console.log('Mini phone receiver '+ports[i]+' unavailable: '+String(e))
-      return next(i+1)
-    })
-  }
-  return next(0)
+  // ONLY the integrated Battery Trio is allowed to ACK. Never fall back
+  // to 18973 (the old BatteryLink port) or an older Mini Companion.
+  const validTrend=trend==='UP'||trend==='DOWN'?trend:'UNKNOWN'
+  const url='http://127.0.0.1:18974/?postData=GTS4MINIBAT%3A'+level+'%3BTREND%3A'+validTrend+'%3B'
+  return fetch({url,method:'GET'}).then(response=>{
+    if(savedResponse(response))return {ok:true,route:'trio-v66'}
+    console.log('BatteryTrio v66 did not ACK (wrong receiver or invalid response)')
+    return {ok:false,route:'wrong-app'}
+  }).catch(error=>{
+    console.log('Battery Trio Mini receiver 18974 unavailable '+String(error))
+    return {ok:false,route:'off'}
+  })
 }
 AppSideService({
   onInit() {
-    console.log('Mini side service v1.5 battery trend forwarding')
+    console.log('Mini side service v1.6 verified Trio receiver')
     builder.listen(()=>{})
     builder.on('request',(ctx)=>{
       let req
