@@ -1,0 +1,54 @@
+name: Build and publish GTS4 Mini charge auth read-only probe
+on:
+  push:
+    branches: [gts4mini-batterylink-v13]
+    paths:
+      - 'mini-charge-probe/**'
+      - '.github/workflows/build-mini-charge-auth.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gts4mini-batterylink-v13
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Ensure Android SDK platform
+        run: |
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar" || sdkmanager "platforms;android-35"
+      - name: Compile independent diagnostics APK
+        run: gradle -p mini-charge-probe :app:assembleDebug --stacktrace
+      - name: Verify and package direct APK
+        run: |
+          set -euo pipefail
+          mkdir -p downloads
+          cp mini-charge-probe/app/build/outputs/apk/debug/app-debug.apk downloads/GTS4Mini_ChargeAuth_Probe_v1.apk
+          unzip -t downloads/GTS4Mini_ChargeAuth_Probe_v1.apk >/dev/null
+          unzip -Z1 downloads/GTS4Mini_ChargeAuth_Probe_v1.apk | grep -qx 'AndroidManifest.xml'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose downloads/GTS4Mini_ChargeAuth_Probe_v1.apk
+          sha256sum downloads/GTS4Mini_ChargeAuth_Probe_v1.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GTS4Mini-ChargeAuth-ReadOnly-Probe-v1
+          path: downloads/GTS4Mini_ChargeAuth_Probe_v1.apk
+          if-no-files-found: error
+      - name: Publish direct APK to branch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/GTS4Mini_ChargeAuth_Probe_v1.apk
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish GTS4 Mini authenticated charge read-only probe [skip ci]'
+            git push origin HEAD:gts4mini-batterylink-v13
+          fi
