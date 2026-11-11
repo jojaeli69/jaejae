@@ -62,7 +62,7 @@ panel.write_text(p,encoding="utf-8")
 # These are not redundant: missing one causes a null ML Kit Translator factory.
 manifest=Path("app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
 assert 'android.permission.INTERNET' in manifest
-assert 'com.google.mlkit.nl.translate' in gradle.read_text(encoding="utf-8")
+assert 'com.google.mlkit:translate:' in gradle.read_text(encoding="utf-8")
 assert 'isMinifyEnabled = false' in gradle.read_text(encoding="utf-8")
 assert 'isShrinkResources = false' in gradle.read_text(encoding="utf-8")
 assert 'ML Kit 번역 엔진 생성 실패' in panel.read_text(encoding="utf-8")
