@@ -1,70 +1,74 @@
 'use strict';
-// Real-watch report: invoking undocumented sensor.start() freezes watch.
-// Guarantee that the safe probe NEVER invokes start or stop.
-const fs=require('fs'), vm=require('vm'), assert=require('assert');
+// This is a read-only probe. Native start/stop caused a real GTS 4 mini freeze in v0.2.
+const assert=require('assert');
+const vm=require('vm');
+const fs=require('fs');
 const src=fs.readFileSync(require('path').join(__dirname,'../pages/index.js'),'utf8');
-const forensic = {startCalls:0,stopCalls:0,removed:0,adds:0};
-function boot(sensorFactory, id){
-  let page,cb;
-  const trace=[],buttons={};
-  const hmUI={
-    widget:{FILL_RECT:1,TEXT:2,BUTTON:3},
-    prop:{MORE:1},
-    text_style:{WRAP:1},
-    createWidget(kind, config) {
-      if(kind===3) buttons[config.text]=config.click_func;
-      return {setProperty(_p, v){trace.push(v.text||'');}};
-    }
-  };
-  const hmSensor={
-    id: id ? {RECORDER:id}: {},event:{},
-    createSensor(n){return sensorFactory(n,x=>{cb=x;});}
-  };
-  const sandbox={hmUI,hmSensor,Page(o){page=o;},console:{log(s){trace.push(String(s));}}};
-  vm.createContext(sandbox);vm.runInContext(src,sandbox);
-  page.build();
-  return {buttons,page,trace,
-    tap(b){assert.equal(typeof buttons[b],'function','missing '+b);buttons[b]();},
-    fire(data){if(cb)cb(data);},
-    has(s){assert(trace.join('\n').includes(s),s+' missing in '+trace.join('\n'));}};
+const calls={start:0,stop:0,open:0,add:0,remove:0};
+function boot(factory){
+ const trace=[],buttons={};let page,callback;
+ const hmUI={widget:{FILL_RECT:1,TEXT:2,BUTTON:3},prop:{MORE:1},text_style:{WRAP:1},
+   createWidget(kind,opts){
+     if(kind===3)buttons[opts.text]=opts.click_func;
+     return {setProperty(_p,v){if(v.text)trace.push(String(v.text));}};
+   }
+ };
+ const hmSensor={id:{RECORDER:34},event:{},
+   createSensor(id){calls.open++;return factory(id,cb=>{callback=cb;});}};
+ const ctx={hmUI,hmSensor,Page(def){page=def;},console:{log(s){trace.push(String(s));}}};
+ vm.createContext(ctx);
+ vm.runInContext(src,ctx,{filename:'pages/index.js'});
+ page.build();
+ return {page,buttons,trace,click(b){assert.equal(typeof buttons[b],'function','Missing '+b);buttons[b]();},
+   fire(payload){if(callback)callback(payload);},
+   has(fragment){assert(trace.join('\n').includes(fragment),'Missing '+fragment+' in '+trace.join('\n'));}};
 }
-function native(onCallback, failAdd){
-  let listener=null;
-  return {
-    start(){forensic.startCalls++;throw new Error('UNSAFE_WATCH_FREEZE');},
-    stop(){forensic.stopCalls++;throw new Error('UNSAFE_WATCH_FREEZE');},
-    getData:undefined,
-    addEventListener(_id,fn){forensic.adds++;if(failAdd)throw new TypeError("cannot read property 'id' of undefined");listener=fn;onCallback(fn);},
-    removeEventListener(_id,fn){assert.equal(listener,fn);forensic.removed++;}
-  };
+function makeSensor(register, cbSink){
+ let listener;
+ return {
+   start(){calls.start++;throw Error('UNSAFE_NATIVE_START');},
+   stop(){calls.stop++;throw Error('UNSAFE_NATIVE_STOP');},
+   addEventListener(e,fn){calls.add++;if(register==='throw')throw new TypeError('native binding inaccessible');
+     listener=fn;cbSink(fn);},
+   removeEventListener(e,fn){calls.remove++;assert.strictEqual(fn,listener);}
+ };
 }
 {
- const a=boot((_id,onCallback)=>native(onCallback));
- a.has('READY');a.tap('CHECK');a.tap('OPEN');a.has('OPEN_OBJECT');
- a.tap('ADD');a.has('ADD_OK');a.fire(new Uint8Array(64));a.has('EVENT');
- a.tap('SAFE');a.has('START_DISABLED');a.tap('CLOSE');a.has('STOP_OK');
- assert(!a.buttons.START, 'Do not expose unsafe start button');
- assert(!a.buttons.STOP, 'Do not expose unsafe native stop button');
+ const a=boot((_id,set)=>makeSensor('ok',set));
+ a.has('READY');a.click('CHECK');a.has('id.RECORDER=34');
+ a.click('STATE');a.has('MISSING');
+ a.click('OPEN');a.has('OPEN_OBJECT');a.click('STATE');a.has('HELD');
+ a.click('LINK');a.has('LINK_OPEN_OK');a.has('LINK_ADD_OK');
+ a.fire(new Uint8Array(12));a.has('EVENT');
+ a.click('CLOSE');a.has('STOP_OK');
+ assert(!a.buttons.START);assert(!a.buttons.SAFE);assert(!a.buttons.ADD);
 }
 {
- const a=boot((_id,onCallback)=>native(onCallback,true));
- a.tap('OPEN');a.tap('ADD');a.has('ADD_ERR');a.tap('SAFE');a.has('START_DISABLED');
- a.tap('CLOSE');a.has('STOP_OK');
+ const before=boot((_id,set)=>makeSensor('ok',set));
+ before.click('OPEN');
+ const after=boot((_id,set)=>makeSensor('ok',set)); // Simulated runtime page rebuild between taps
+ after.click('STATE');after.has('MISSING');
+ after.click('LINK');after.has('LINK_ADD_OK');
+ after.click('CLOSE');after.page.onDestroy();
 }
 {
- const a=boot(()=>null);a.tap('OPEN');a.has('OPEN_EMPTY');a.tap('SAFE');a.has('START_DISABLED');
+ const a=boot((_id,set)=>makeSensor('throw',set));
+ a.click('LINK');a.has('LINK_OPEN_OK');a.has('ADD_ERR');a.has('LINK_ADD_FAIL');
+ a.click('STATE');a.has('HELD');a.click('CLOSE');
 }
 {
- const a=boot((_id,onCallback)=>native(onCallback),34);
- a.tap('OPEN');a.tap('OPEN');a.tap('ADD');a.tap('CLOSE');
- a.page.onDestroy();a.has('STOP_OK');
+ const a=boot(()=>null);
+ a.click('LINK');a.has('LINK_OPEN_FAIL');a.click('STATE');a.has('MISSING');
 }
 {
- const a=boot(()=>({start(){forensic.startCalls++},stop(){forensic.stopCalls++}}));
- a.tap('OPEN');a.tap('ADD');a.has('ADD_NO_API');a.tap('SAFE');a.has('START_DISABLED');a.tap('CLOSE');
+ const a=boot(()=>({start(){calls.start++},stop(){calls.stop++}}));
+ a.click('LINK');a.has('ADD_NO_API');a.has('LINK_ADD_FAIL');a.click('CLOSE');
 }
-assert.equal(forensic.startCalls,0,'Critical: native start was invoked');
-assert.equal(forensic.stopCalls,0,'Critical: native stop was invoked');
-assert(forensic.adds>=2);
-assert(forensic.removed>=1);
-console.log('PASS 5 v0.3 safe-probe VM scenarios, 0 native start/stop calls');
+{
+ const a=boot((_id,set)=>makeSensor('ok',set));
+ a.click('LINK');a.click('LINK');a.has('LINK_ADD_OK');a.page.onDestroy();
+}
+assert.strictEqual(calls.start,0,'Watch-freezing start invoked');
+assert.strictEqual(calls.stop,0,'Native stop invoked');
+assert(calls.open>=6 && calls.add>=3 && calls.remove>=1);
+console.log('PASS 6 v0.4 GTS4 mini safe probe VM scenarios; native start=0 stop=0');
