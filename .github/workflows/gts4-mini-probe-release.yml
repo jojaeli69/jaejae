@@ -49,7 +49,7 @@ jobs:
           with zipfile.ZipFile(source) as bundle:
               package=next(n for n in bundle.namelist() if n.endswith('.zpk'))
               d=bundle.read(package)
-              assert d[:4]==b'PK\\x03\\x04'
+              assert d[:4]==b'PK\x03\x04'
           open('gts4-mini-public/GTS4Mini_MicProbe_Official.zpk','wb').write(d)
           print('ZAB sha256:',hashlib.sha256(open(source,'rb').read()).hexdigest())
           print('ZPK sha256:',hashlib.sha256(d).hexdigest())
