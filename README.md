@@ -1,13 +1,14 @@
-# QuietRings GTS 4 Mini watchface tests
+# QuietRings GTS4 Mini watchface QR test branch
 
-## v1.2 Unified layout
+Latest: v1.3 (`QuietRings_GTS4Mini_DIALOG_v1.3.zpk`)
 
-- GTS4 Mini 336x384 native Dialog image format (same device-proven runtime as v1.1)
-- Entire watchface geometry reflow: date and time optical right edge=318; 3 rings at y=30/144/258; minute and steps ring bottom=360
-- Fixed PNG background indices via exact original Dialog palette to avoid the v1.0 broken stripes
-- App picker cover regenerated to match v1.2
-- v1.2 ZPK is an experimental hardware test build; actual GTS4 Mini rendering of v1.2 unverified
+- Device: Amazfit GTS 4 Mini 336x384, Zepp OS 1.0, Dialog native assets
+- Based on watch-rendered v1.1 / design-reflow v1.2
+- v1.3: Wednesday ("수") shifted down by 2 display pixels with X unchanged
+- Hour/minute number row gap increased from 6 to 17 pixels, glyph size unchanged
+- AOD time layout also uses new y positions
+- Offline syntax, asset serialization, ZIP structure and preview checked. Actual v1.3 physical watch result unverified.
 
-ZPK: `QuietRings_GTS4Mini_DIALOG_v1.2.zpk`
+Install through Zepp developer-mode QR (experimental): `watchface://raw.githubusercontent.com/jojaeli69/jaejae/quierrings-gts4mini-qr-test-20261111/QuietRings_GTS4Mini_DIALOG_v1.3.zpk`
 
-Other experimental builds preserved for rollback.
+Previous v1.2 and v1.1 builds retained for rollback.
