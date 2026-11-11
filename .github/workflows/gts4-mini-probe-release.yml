@@ -1,0 +1,69 @@
+name: Build and publish GTS 4 mini microphone probe
+on:
+  push:
+    branches:
+      - codex/gts4-mini-probe-release
+    paths:
+      - 'gts4-mini-probe/**'
+      - '.github/workflows/gts4-mini-probe-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Restore target-specific icon and validate source
+        run: |
+          base64 -d gts4-mini-probe/icon.png.b64 > gts4-mini-probe/assets/gts4mini/icon.png
+          node --check gts4-mini-probe/app.js
+          node --check gts4-mini-probe/pages/index.js
+          python3 -m json.tool gts4-mini-probe/app.json >/dev/null
+      - name: Install official Zepp Zeus CLI
+        run: |
+          npm install --global @zeppos/zeus-cli@1.9.3 --no-audit --no-fund
+          zeus --version
+      - name: Compile official GTS 4 mini ZAB
+        working-directory: gts4-mini-probe
+        run: |
+          zeus build -t gts4mini
+          find dist -maxdepth 4 -type f -print
+      - name: Extract and validate installable bundle
+        run: |
+          mkdir -p gts4-mini-public
+          ZAB=$(find gts4-mini-probe/dist -type f -name '*.zab' | head -n 1)
+          test -n "$ZAB"
+          cp "$ZAB" gts4-mini-public/GTS4Mini_MicProbe_Official.zab
+          python3 - <<'PY'
+          import zipfile,io,hashlib
+          source='gts4-mini-public/GTS4Mini_MicProbe_Official.zab'
+          with zipfile.ZipFile(source) as bundle:
+              package=next(n for n in bundle.namelist() if n.endswith('.zpk'))
+              d=bundle.read(package)
+              assert d[:4]==b'PK\\x03\\x04'
+          open('gts4-mini-public/GTS4Mini_MicProbe_Official.zpk','wb').write(d)
+          print('ZAB sha256:',hashlib.sha256(open(source,'rb').read()).hexdigest())
+          print('ZPK sha256:',hashlib.sha256(d).hexdigest())
+          PY
+      - name: Publish binary files to isolated branch
+        run: |
+          git config user.name 'GTS4 Mini Build Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add gts4-mini-public/GTS4Mini_MicProbe_Official.zab gts4-mini-public/GTS4Mini_MicProbe_Official.zpk
+          if git diff --cached --quiet; then
+            echo "Compiled package unchanged."
+          else
+            git commit -m 'Publish official GTS 4 mini mic probe build'
+            git push origin HEAD:codex/gts4-mini-probe-release
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gts4-mini-probe-official-package
+          path: gts4-mini-public/*
+          if-no-files-found: error
