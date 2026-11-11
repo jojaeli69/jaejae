@@ -86,6 +86,7 @@ jobs:
           python3 ../newswipe/balanced_language_key_v216.py
           python3 ../newswipe/resize_symbol_enter_v217.py
           python3 ../newswipe/fix_translation_v218.py
+          python3 ../newswipe/fix_mlkit_release_npe_v219.py
           mkdir -p /tmp/newswipe-clipboard-test
           javac -d /tmp/newswipe-clipboard-test \
             app/src/main/java/com/alternative_studios/newswipe/clipboard/ClipboardHistory.java \
@@ -102,8 +103,8 @@ jobs:
           s = s.replace("        versionCode = 21", "        ndk {\n            abiFilters.add(\"arm64-v8a\")\n        }\n        versionCode = 21")
           s = s.replace('applicationId = "com.alternative_studios.newswipe"',
                         'applicationId = "com.alternative_studios.newswipe.personal"')
-          s = s.replace("versionCode = 21", "versionCode = 108")
-          s = s.replace('versionName = "1.9.1"', 'versionName = "2.1.8-stable"')
+          s = s.replace("versionCode = 21", "versionCode = 109")
+          s = s.replace('versionName = "1.9.1"', 'versionName = "2.1.9-stable"')
           # No changing debug suffix: stable package ID must stay constant.
           p.write_text(s)
           Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
@@ -121,6 +122,11 @@ jobs:
           mkdir -p ../built
           cp app/build/outputs/apk/release/app-release.apk ../built/NewSwipe-Stable-TO-RESIGN.apk
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging ../built/NewSwipe-Stable-TO-RESIGN.apk | head -5
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree ../built/NewSwipe-Stable-TO-RESIGN.apk AndroidManifest.xml > /tmp/newswipe-release-manifest.txt
+          for required in MlKitInitProvider NaturalLanguageTranslateRegistrar CommonComponentRegistrar; do
+            grep -q "$required" /tmp/newswipe-release-manifest.txt || { echo "MISSING ML KIT REGISTRAR: $required"; exit 1; }
+          done
+          echo "ML Kit RELEASE provider and translation/common registrars verified"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../built/NewSwipe-Stable-TO-RESIGN.apk
           sha256sum ../built/*.apk
       - uses: actions/upload-artifact@v4
