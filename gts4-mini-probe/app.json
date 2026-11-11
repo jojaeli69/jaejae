@@ -5,11 +5,11 @@
     "appName": "Mini Mic Probe",
     "appType": "app",
     "version": {
-      "code": 2,
-      "name": "0.2.0"
+      "code": 3,
+      "name": "0.3.0"
     },
     "vender": "Personal",
-    "description": "GTS 4 mini staged mic sensor diagnostic; does not capture or store audio",
+    "description": "Safe read-only sensor diagnostic. Native start/stop disabled after watch freeze.",
     "icon": "icon.png"
   },
   "runtime": {
