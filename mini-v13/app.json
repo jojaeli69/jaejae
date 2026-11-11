@@ -1,0 +1,55 @@
+{
+  "configVersion": "v2",
+  "app": {
+    "appId": 90002611,
+    "appName": "Mini BatteryLink",
+    "appType": "app",
+    "version": {
+      "code": 3,
+      "name": "1.3.0"
+    },
+    "vender": "Personal Project",
+    "description": "Zepp OS 1.0 BLE diagnostics and Mini battery relay",
+    "icon": "icon.png"
+  },
+  "runtime": {
+    "apiVersion": {
+      "minVersion": "1.0.0",
+      "compatible": "1.0.0",
+      "target": "1.0.1"
+    }
+  },
+  "permissions": [],
+  "targets": {
+    "gts4mini": {
+      "module": {
+        "page": {
+          "pages": [
+            "page/index"
+          ]
+        },
+        "app-side": {
+          "path": "app-side/index"
+        }
+      },
+      "platforms": [
+        {
+          "name": "gts-4-mini",
+          "deviceSource": 246
+        },
+        {
+          "name": "gts-4-mini-w",
+          "deviceSource": 247
+        }
+      ],
+      "designWidth": 336
+    }
+  },
+  "i18n": {
+    "en-US": {
+      "appName": "Mini BatteryLink"
+    }
+  },
+  "defaultLanguage": "en-US",
+  "debug": true
+}
