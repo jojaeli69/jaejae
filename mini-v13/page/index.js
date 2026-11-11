@@ -3,12 +3,14 @@
 // UP/DOWN are percent trends, not verified charging/discharging flags.
 const POLL_MS=30000
 const HEARTBEAT_TICKS=4
+// Zepp OS 1.0 sensors fire only while the watch Device App stays alive.
 Page({
   onInit(){
     this.battery=null
     this.active=false
     this.busy=false
     this.queued=false
+    this.retryPending=false
     this.ticks=0
     this.poller=0
     this.observed=-1
@@ -23,7 +25,7 @@ Page({
     this.bridge=getApp()._options.globalData.messageBuilder
     const level=this.batteryLevel()
     this.observed=level
-    hmUI.createWidget(hmUI.widget.TEXT,{x:14,y:29,w:308,h:54,text:'Mini BatteryLink v1.5',color:0xffffff,text_size:27,align_h:hmUI.align.CENTER_H})
+    hmUI.createWidget(hmUI.widget.TEXT,{x:14,y:29,w:308,h:54,text:'Mini BatteryLink v1.6',color:0xffffff,text_size:27,align_h:hmUI.align.CENTER_H})
     this.levelText=hmUI.createWidget(hmUI.widget.TEXT,{x:14,y:95,w:308,h:80,text:level<0?'--%':level+'%',color:0x70db9d,text_size:66,align_h:hmUI.align.CENTER_H})
     this.note=hmUI.createWidget(hmUI.widget.TEXT,{x:10,y:182,w:316,h:54,text:'AUTO CHANGE ACTIVE',color:0xd4e0e8,text_size:18,align_h:hmUI.align.CENTER_H})
     hmUI.createWidget(hmUI.widget.BUTTON,{x:22,y:244,w:292,h:52,text:'1 TEST ZEPP',normal_color:0x294d74,press_color:0x1b334d,color:0xffffff,text_size:23,radius:9,click_func:()=>this.ping()})
@@ -37,7 +39,11 @@ Page({
     try{this.poller=timer.createTimer(3000,POLL_MS,()=>{
       this.ticks++
       this.checkChange('POLL')
-      if(this.ticks%HEARTBEAT_TICKS===0 && this.active && !this.busy) this.report('HEARTBEAT')
+      // Retry a lost phone delivery on next poll without recursively hammering Zepp.
+      if(this.retryPending && this.active && !this.busy) {
+        this.retryPending=false
+        this.report('RETRY')
+      } else if(this.ticks%HEARTBEAT_TICKS===0 && this.active && !this.busy) this.report('HEARTBEAT')
     },{})}catch(e){this.status('POLL TIMER ERROR')}
     // Send the initial battery automatically; no manual tapping is required.
     this.report('OPEN')
@@ -86,18 +92,24 @@ Page({
           this.status(res&&res.ok===true&&res.step==='ZEPP'?'ZEPP LINK SUCCESS':'ZEPP BAD RESPONSE')
         else if(res&&res.ok===true&&res.step==='PHONE') {
           this.lastSent=payload.level
-          this.status('PHONE SAVED: '+String(res.route||'mini'))
-        } else if(res&&res.step==='PHONE')this.status('PHONE RECEIVER OFF')
+          this.retryPending=false
+          this.status('TRIO RECEIVED '+payload.level+'%')
+        } else if(res&&res.step==='PHONE') {
+          this.retryPending=true
+          this.status(res.route==='wrong-app'?'MINI COMPANION CONFLICT':'PHONE RECEIVER OFF')
+        }
         else this.status('ZEPP RESPONSE ERROR')
         after()
       }).catch(e=>{
         if(!this.active)return
         console.log('Mini '+kind+' request error '+String(e))
+        if(kind==='BATTERY')this.retryPending=true
         this.status(String(e).toLowerCase().includes('time')?'NO ZEPP RESPONSE':'ZEPP BRIDGE ERROR')
         after()
       })
     }catch(e){
       console.log('Mini synchronous request '+String(e))
+      if(kind==='BATTERY')this.retryPending=true
       this.status('REQUEST START ERROR')
       after()
     }
@@ -116,6 +128,7 @@ Page({
   onDestroy(){
     this.active=false
     this.queued=false
+    this.retryPending=false
     if(this.poller)try{timer.stopTimer(this.poller)}catch(e){}
     if(this.lastSensorCallback&&this.battery){
       try{this.battery.removeEventListener(hmSensor.event.CHANGE,this.lastSensorCallback)}catch(e){}
