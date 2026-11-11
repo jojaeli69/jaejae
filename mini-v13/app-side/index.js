@@ -11,12 +11,13 @@ function savedResponse(response){
   const code=Number(response.status||response.statusCode||response.code||200)
   return code>=200&&code<300&&!!body&&body.stored===true
 }
-function sendToPhone(level) {
+function sendToPhone(level,trend) {
   // Keep the existing BatteryLink app unchanged: use the separate Mini companion.
   const ports=[18974,18973]
   function next(i){
     if(i>=ports.length)return Promise.resolve({ok:false,route:'none'})
-    const url='http://127.0.0.1:'+ports[i]+'/?postData=GTS4MINIBAT%3A'+level+'%3B'
+    const validTrend=trend==='UP'||trend==='DOWN'?trend:'UNKNOWN'
+    const url='http://127.0.0.1:'+ports[i]+'/?postData=GTS4MINIBAT%3A'+level+'%3BTREND%3A'+validTrend+'%3B'
     return fetch({url,method:'GET'}).then(res=>{
       if(savedResponse(res))return {ok:true,route:ports[i]===18974?'mini':'v45'}
       return next(i+1)
@@ -29,7 +30,7 @@ function sendToPhone(level) {
 }
 AppSideService({
   onInit() {
-    console.log('Mini side service v1.4 boot')
+    console.log('Mini side service v1.5 battery trend forwarding')
     builder.listen(()=>{})
     builder.on('request',(ctx)=>{
       let req
@@ -46,7 +47,7 @@ AppSideService({
       } else if(req.method==='BATTERY') {
         const n=Number(req.level)
         if(!Number.isInteger(n)||n<0||n>100)return reply({ok:false,step:'INVALID_LEVEL'})
-        sendToPhone(n).then(r=>reply({ok:r.ok,step:'PHONE',route:r.route})).catch(e=>{
+        sendToPhone(n,req.trend).then(r=>reply({ok:r.ok,step:'PHONE',route:r.route})).catch(e=>{
           console.log('Mini phone relay failed '+String(e))
           reply({ok:false,step:'HTTP_ERROR',route:'none'})
         })
