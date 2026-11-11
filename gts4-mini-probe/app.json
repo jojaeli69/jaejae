@@ -1,0 +1,52 @@
+{
+  "configVersion": "v2",
+  "app": {
+    "appId": 90002179,
+    "appName": "Mini Mic Probe",
+    "appType": "app",
+    "version": {
+      "code": 4,
+      "name": "0.4.0"
+    },
+    "vender": "Personal",
+    "description": "Safe GTS4mini probe with one-click OPEN+ADD and state check; native START/STOP disabled",
+    "icon": "icon.png"
+  },
+  "runtime": {
+    "apiVersion": {
+      "compatible": "1.0.0",
+      "target": "1.0.1",
+      "minVersion": "1.0.0"
+    }
+  },
+  "permissions": [],
+  "debug": true,
+  "i18n": {
+    "en-US": {
+      "appName": "Mini Mic Probe"
+    }
+  },
+  "defaultLanguage": "en-US",
+  "targets": {
+    "gts4mini": {
+      "module": {
+        "page": {
+          "pages": [
+            "pages/index"
+          ]
+        }
+      },
+      "platforms": [
+        {
+          "name": "gts-4-mini",
+          "deviceSource": 246
+        },
+        {
+          "name": "gts-4-mini-w",
+          "deviceSource": 247
+        }
+      ],
+      "designWidth": 336
+    }
+  }
+}

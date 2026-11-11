@@ -1,0 +1,118 @@
+name: Build and publish GTS 4 mini microphone probe
+on:
+  push:
+    branches:
+      - codex/gts4-mini-probe-release
+    paths:
+      - 'gts4-mini-probe/**'
+      - '.github/workflows/gts4-mini-probe-release.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'gts4-mini-probe/**'
+      - '.github/workflows/gts4-mini-probe-release.yml'
+  workflow_dispatch:
+concurrency:
+  group: gts4-mini-probe-release
+  cancel-in-progress: true
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          ref: codex/gts4-mini-probe-release
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Restore target-specific icon and validate source
+        run: |
+          base64 -d gts4-mini-probe/icon.png.b64 > gts4-mini-probe/assets/gts4mini/icon.png
+          node --check gts4-mini-probe/app.js
+          node --check gts4-mini-probe/pages/index.js
+          node gts4-mini-probe/tests/mic_probe.test.cjs
+          if grep -nE '(^|[^[:alnum:]_])sensor\\.(start|stop)\\(' gts4-mini-probe/pages/index.js; then echo 'Unsafe native start or stop call found'; exit 1; fi
+          python3 -m json.tool gts4-mini-probe/app.json >/dev/null
+      - name: Install official Zepp Zeus CLI
+        run: |
+          npm install --global @zeppos/zeus-cli@1.9.3 --no-audit --no-fund
+          zeus --version
+      - name: Compile official GTS 4 mini ZAB
+        working-directory: gts4-mini-probe
+        run: |
+          zeus build -t gts4mini
+          find dist -maxdepth 4 -type f -print
+      - name: Extract and validate installable bundle
+        run: |
+          mkdir -p gts4-mini-public
+          ZAB=$(find gts4-mini-probe/dist -type f -name '*.zab' | head -n 1)
+          test -n "$ZAB"
+          cp "$ZAB" gts4-mini-public/GTS4Mini_MicProbe_Official.zab
+          python3 - <<'PY'
+          import zipfile,io,hashlib
+          source='gts4-mini-public/GTS4Mini_MicProbe_Official.zab'
+          with zipfile.ZipFile(source) as bundle:
+              package=next(n for n in bundle.namelist() if n.endswith('.zpk'))
+              d=bundle.read(package)
+              assert d[:4]==b'PK\x03\x04'
+          open('gts4-mini-public/GTS4Mini_MicProbe_Official.zpk','wb').write(d)
+          print('ZAB sha256:',hashlib.sha256(open(source,'rb').read()).hexdigest())
+          print('ZPK sha256:',hashlib.sha256(d).hexdigest())
+          PY
+      - name: Convert production ZPK to developer preview ZPK
+        run: |
+          python3 - <<'PY'
+          import zipfile,io,json,hashlib
+          from pathlib import Path
+          root=Path('gts4-mini-public')
+          source=root/'GTS4Mini_MicProbe_Official.zpk'
+          target=root/'GTS4Mini_MicProbe_PREVIEW_v04.zpk'
+          patches=[]
+          def rewrite_zip(data, callback):
+              buf=io.BytesIO()
+              with zipfile.ZipFile(io.BytesIO(data),'r') as r,zipfile.ZipFile(buf,'w') as w:
+                  for info in r.infolist():
+                      w.writestr(info,callback(info.filename,r.read(info.filename)))
+              return buf.getvalue()
+          def patch_app(path,data):
+              if path!='app.json':
+                  return data
+              app=json.loads(data)
+              previous=app['packageInfo']['mode']
+              if previous not in ('production','preview'):
+                  raise ValueError('Unexpected package mode '+str(previous))
+              app['packageInfo']['mode']='preview'
+              patches.append(previous)
+              return json.dumps(app,ensure_ascii=False,separators=(',',':')).encode('utf-8')
+          def patch_outer(path,data):
+              return rewrite_zip(data,patch_app) if path in ('device.zip','app-side.zip') else data
+          target.write_bytes(rewrite_zip(source.read_bytes(),patch_outer))
+          assert len(patches)==2,patches
+          with zipfile.ZipFile(target) as z:
+              for inner in ('device.zip','app-side.zip'):
+                  with zipfile.ZipFile(io.BytesIO(z.read(inner))) as zz:
+                      assert json.loads(zz.read('app.json'))['packageInfo']['mode']=='preview'
+          print('PREVIEW_PACKAGE_OK',target.stat().st_size,hashlib.sha256(target.read_bytes()).hexdigest())
+          PY
+      - name: Publish binary files to isolated branch
+        run: |
+          git config user.name 'GTS4 Mini Build Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add gts4-mini-public/GTS4Mini_MicProbe_Official.zab gts4-mini-public/GTS4Mini_MicProbe_Official.zpk gts4-mini-public/GTS4Mini_MicProbe_PREVIEW_v04.zpk
+          if git diff --cached --quiet; then
+            echo "Compiled package unchanged."
+          else
+            git commit -m 'Publish official GTS 4 mini mic probe build'
+            git fetch origin codex/gts4-mini-probe-release
+            git rebase origin/codex/gts4-mini-probe-release
+            git push origin HEAD:codex/gts4-mini-probe-release
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gts4-mini-probe-v04-official-preview-package
+          path: gts4-mini-public/*
+          if-no-files-found: error
