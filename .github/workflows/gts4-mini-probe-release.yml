@@ -9,6 +9,9 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - 'gts4-mini-probe/**'
+      - '.github/workflows/gts4-mini-probe-release.yml'
   workflow_dispatch:
 permissions:
   contents: write
@@ -19,6 +22,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
+          ref: codex/gts4-mini-probe-release
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -54,15 +58,51 @@ jobs:
           print('ZAB sha256:',hashlib.sha256(open(source,'rb').read()).hexdigest())
           print('ZPK sha256:',hashlib.sha256(d).hexdigest())
           PY
+      - name: Convert production ZPK to developer preview ZPK
+        run: |
+          python3 - <<'PY'
+          import zipfile,io,json,hashlib
+          from pathlib import Path
+          root=Path('gts4-mini-public')
+          source=root/'GTS4Mini_MicProbe_Official.zpk'
+          target=root/'GTS4Mini_MicProbe_PREVIEW.zpk'
+          patches=[]
+          def rewrite_zip(data, callback):
+              buf=io.BytesIO()
+              with zipfile.ZipFile(io.BytesIO(data),'r') as r,zipfile.ZipFile(buf,'w') as w:
+                  for info in r.infolist():
+                      w.writestr(info,callback(info.filename,r.read(info.filename)))
+              return buf.getvalue()
+          def patch_app(path,data):
+              if path!='app.json':
+                  return data
+              app=json.loads(data)
+              previous=app['packageInfo']['mode']
+              if previous not in ('production','preview'):
+                  raise ValueError('Unexpected package mode '+str(previous))
+              app['packageInfo']['mode']='preview'
+              patches.append(previous)
+              return json.dumps(app,ensure_ascii=False,separators=(',',':')).encode('utf-8')
+          def patch_outer(path,data):
+              return rewrite_zip(data,patch_app) if path in ('device.zip','app-side.zip') else data
+          target.write_bytes(rewrite_zip(source.read_bytes(),patch_outer))
+          assert len(patches)==2,patches
+          with zipfile.ZipFile(target) as z:
+              for inner in ('device.zip','app-side.zip'):
+                  with zipfile.ZipFile(io.BytesIO(z.read(inner))) as zz:
+                      assert json.loads(zz.read('app.json'))['packageInfo']['mode']=='preview'
+          print('PREVIEW_PACKAGE_OK',target.stat().st_size,hashlib.sha256(target.read_bytes()).hexdigest())
+          PY
       - name: Publish binary files to isolated branch
         run: |
           git config user.name 'GTS4 Mini Build Bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add gts4-mini-public/GTS4Mini_MicProbe_Official.zab gts4-mini-public/GTS4Mini_MicProbe_Official.zpk
+          git add gts4-mini-public/GTS4Mini_MicProbe_Official.zab gts4-mini-public/GTS4Mini_MicProbe_Official.zpk gts4-mini-public/GTS4Mini_MicProbe_PREVIEW.zpk
           if git diff --cached --quiet; then
             echo "Compiled package unchanged."
           else
             git commit -m 'Publish official GTS 4 mini mic probe build'
+            git pull --rebase origin codex/gts4-mini-probe-release
             git push origin HEAD:codex/gts4-mini-probe-release
           fi
       - uses: actions/upload-artifact@v4
