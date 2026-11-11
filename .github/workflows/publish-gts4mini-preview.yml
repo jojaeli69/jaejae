@@ -1,0 +1,29 @@
+name: Publish GTS4 Mini Preview Installer
+on:
+  push:
+    branches: [gts4mini-batterylink-v1]
+    paths:
+      - 'scripts/publish_gts4mini_preview.py'
+      - '.github/workflows/publish-gts4mini-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  preview-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gts4mini-batterylink-v1
+          persist-credentials: true
+      - name: Repack preview and validate
+        run: python3 scripts/publish_gts4mini_preview.py
+      - name: Commit installable preview archives
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add GTS4Mini_BatteryLink_v1_1_Preview.zpk GTS4Mini_BatteryLink_v1_1_Preview.zab
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish Mini BatteryLink v1.1 preview QR packages [skip ci]'
+            git push origin HEAD:gts4mini-batterylink-v1
+          fi
