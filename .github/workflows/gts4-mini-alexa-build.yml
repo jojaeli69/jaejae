@@ -58,6 +58,10 @@ jobs:
             echo "Unexpected undocumented sensor call"
             exit 1
           fi
+      - name: Replace unavailable JitPack DAO generator with published greenDAO
+        run: |
+          sed -i 's@com.github.Freeyourgadget:greendao:1998d7cd2d21f662c6044f6ccf3b3a251bbad341@org.greenrobot:greendao-generator:2.2.0@g' upstream/GBDaoGenerator/build.gradle
+          grep "org.greenrobot:greendao-generator:2.2.0" upstream/GBDaoGenerator/build.gradle
       - name: Build independently installable debug-signed mainlineNopebble APK
         working-directory: upstream
         run: |
