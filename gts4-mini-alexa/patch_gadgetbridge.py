@@ -8,6 +8,8 @@ import shutil
 
 SERVICE = Path("app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/huami/zeppos/services/ZeppOsAlexaService.java")
 SETTINGS = Path("app/src/main/res/xml/devicesettings_huami2021_alexa.xml")
+COORDINATOR = Path("app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/huami/zeppos/ZeppOsCoordinator.java")
+CUSTOMIZER = Path("app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/huami/zeppos/ZeppOsSettingsCustomizer.java")
 
 def replace_once(s, before, after):
     count = s.count(before)
@@ -121,20 +123,45 @@ def patch_xml(s):
             <Preference
                 android:key="zepp_os_alexa_btn_trigger"''')
 
+def patch_coordinator(s):
+    # Gadgetbridge normally exposes Alexa debug settings only with the experimental
+    # flag and a capabilities response. This diagnostic build keeps the Alexa
+    # screen available even when capabilities have not yet been negotiated.
+    return replace_once(s,
+        "        if (supportsAlexa(device)) {\\n            developer.add(R.xml.devicesettings_huami2021_alexa);\\n        }",
+        "        // Diagnostic only: always show Alexa settings for opt-in BLE voice test.\\n        developer.add(R.xml.devicesettings_huami2021_alexa);")
+
+
+def patch_customizer(s):
+    # Preference clicks are NOT automatic. Without this registration the
+    # new button appears but does nothing.
+    return replace_once(s,
+        '                handler.findPreference("zepp_os_alexa_btn_trigger"),',
+        '                handler.findPreference("zepp_os_alexa_btn_capture_once"),\\n'
+        '                handler.findPreference("zepp_os_alexa_btn_trigger"),')
+
+
 def apply(root, dry):
     j = root / SERVICE
     x = root / SETTINGS
     helper = j.parent / "ZeppOsAlexaRawCapture.java"
-    assert j.exists() and x.exists(), "Upstream file paths changed"
+    coordinator = root / COORDINATOR
+    customizer = root / CUSTOMIZER
+    assert all(p.exists() for p in (j,x,coordinator,customizer)), "Upstream file paths changed"
     assert not helper.exists(), "Already patched"
     js = patch_java(j.read_text(encoding="utf-8"))
     xs = patch_xml(x.read_text(encoding="utf-8"))
+    cs = patch_coordinator(coordinator.read_text(encoding="utf-8"))
+    ss = patch_customizer(customizer.read_text(encoding="utf-8"))
     assert "rawCapture.onVoiceData" in js and "capture_once" in xs
+    assert 'handler.findPreference("zepp_os_alexa_btn_capture_once")' in ss
     if dry:
         print("PATCH_DRY_RUN_OK: source anchors verified")
         return
     j.write_text(js, encoding="utf-8")
     x.write_text(xs, encoding="utf-8")
+    coordinator.write_text(cs, encoding="utf-8")
+    customizer.write_text(ss, encoding="utf-8")
     shutil.copy2(Path(__file__).with_name("ZeppOsAlexaRawCapture.java"), helper)
     print("PATCH_OK",j,x,helper,sep="\n")
 
