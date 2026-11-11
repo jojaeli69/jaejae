@@ -1,4 +1,4 @@
-// GTS 4 mini experimental microphone access diagnostics v0.2.0.
+// GTS 4 mini experimental microphone access diagnostics v0.3.0.
 // Tests an undocumented sensor candidate (34 / 0x2201). Object creation is NOT audio proof.
 // Do not record, store, or transmit callback payloads.
 var sensor = null;
@@ -7,7 +7,6 @@ var eventListener = null;
 var eventId = 8705;
 var eventCount = 0;
 var added = false;
-var started = false;
 var statusLines = [];
 
 function safeRead(obj, key) {
@@ -17,7 +16,7 @@ function safeRead(obj, key) {
 function briefError(err) { return String(err).replace(/\s+/g, ' ').slice(0, 96); }
 function report(label, detail) {
   var line = label + (detail ? ': ' + detail : '');
-  console.log('[MiniMicProbe v0.2] ' + line);
+  console.log('[MiniMicProbe v0.3] ' + line);
   statusLines.push(line);
   if (statusLines.length > 5) statusLines.shift();
   if (statusWidget) {
@@ -48,12 +47,7 @@ function cleanup(quiet) {
       if (typeof removeFn === 'function') removeFn.call(sensor, eventId, eventListener);
     } catch (err) { failure.push('remove ' + briefError(err)); }
   }
-  try {
-    var stopFn = safeRead(sensor, 'stop');
-    if (typeof stopFn === 'function') stopFn.call(sensor);
-  } catch (err) { failure.push('stop ' + briefError(err)); }
   added = false;
-  started = false;
   eventListener = null;
   sensor = null;
   if (!quiet) report(failure.length ? 'STOP_ERR' : 'STOP_OK', failure.length ? failure.join(' / ') : 'events=' + eventCount);
@@ -112,35 +106,27 @@ function add() {
     report('ADD_ERR', briefError(err));
   }
 }
-function start() {
-  if (!sensor) { report('START_NO_OPEN', 'press OPEN first'); return; }
-  if (started) { report('START_ALREADY', 'press STOP before retry'); return; }
-  var fn = safeRead(sensor, 'start');
-  if (typeof fn !== 'function') { report('START_NO_API', 'start=' + typeof fn); return; }
-  if (!added) report('START_NOTE', 'listener missing; event count unavailable');
-  try {
-    var result = fn.call(sensor);
-    started = true;
-    report('START_RET', String(result) + ' (not recording proof)');
-  } catch (err) {
-    report('START_ERR', briefError(err));
-  }
+// Native start()/stop() are NEVER called: a watch froze in v0.2.
+function safety() {
+  report('START_DISABLED','v0.2 native start froze the watch');
+  if (sensor) report('INSPECT', methods(sensor));
+  else report('INSPECT', 'press OPEN then ADD; no audio capture');
 }
 Page({
   build: function () {
     hmUI.createWidget(hmUI.widget.FILL_RECT, {x:0,y:0,w:336,h:384,color:0x101820});
-    hmUI.createWidget(hmUI.widget.TEXT, {x:10,y:10,w:315,h:39,text:'Mini Mic Probe 0.2',text_size:20,color:0xffffff});
-    hmUI.createWidget(hmUI.widget.TEXT, {x:10,y:50,w:315,h:23,text:'Mini only / experimental / no PCM',text_size:13,color:0xb7cad4});
-    statusWidget = hmUI.createWidget(hmUI.widget.TEXT, {x:10,y:76,w:315,h:164,text:'CHECK > OPEN > ADD > START',text_size:15,color:0xffdca3,text_style:hmUI.text_style.WRAP});
+    hmUI.createWidget(hmUI.widget.TEXT, {x:10,y:10,w:315,h:39,text:'Mini Mic Probe 0.3',text_size:20,color:0xffffff});
+    hmUI.createWidget(hmUI.widget.TEXT, {x:10,y:50,w:315,h:23,text:'Safe mode / native START disabled',text_size:13,color:0xb7cad4});
+    statusWidget = hmUI.createWidget(hmUI.widget.TEXT, {x:10,y:76,w:315,h:164,text:'CHECK > OPEN > ADD > SAFE',text_size:15,color:0xffdca3,text_style:hmUI.text_style.WRAP});
     function button(x,y,w,label,fn) {
       hmUI.createWidget(hmUI.widget.BUTTON, {x:x,y:y,w:w,h:53,text:label,text_size:17,normal_color:0x285b75,press_color:0x14354a,color:0xffffff,click_func:fn});
     }
     button(6,244,103,'CHECK',check);
     button(116,244,103,'OPEN',open);
     button(226,244,103,'ADD',add);
-    button(6,307,156,'START',start);
-    hmUI.createWidget(hmUI.widget.BUTTON, {x:170,y:307,w:159,h:53,text:'STOP',text_size:17,normal_color:0x5c3842,press_color:0x3e242a,color:0xffffff,click_func:function(){cleanup(false);}});
-    report('READY', 'mini sensor candidate 34; 8705');
+    button(6,307,156,'SAFE',safety);
+    hmUI.createWidget(hmUI.widget.BUTTON, {x:170,y:307,w:159,h:53,text:'CLOSE',text_size:17,normal_color:0x5c3842,press_color:0x3e242a,color:0xffffff,click_func:function(){cleanup(false);}});
+    report('READY', 'START blocked: watch froze on v0.2');
   },
   onDestroy: function () { cleanup(true); statusWidget = null; statusLines = []; }
 });
