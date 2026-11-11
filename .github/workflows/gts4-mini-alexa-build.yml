@@ -54,6 +54,8 @@ jobs:
           python3 gts4-mini-alexa/patch_gadgetbridge.py upstream --dry-run
           python3 gts4-mini-alexa/patch_gadgetbridge.py upstream
           test -f upstream/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/huami/zeppos/services/ZeppOsAlexaRawCapture.java
+          grep -F 'handler.findPreference("zepp_os_alexa_btn_capture_once")' upstream/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/huami/zeppos/ZeppOsSettingsCustomizer.java
+          grep -F 'developer.add(R.xml.devicesettings_huami2021_alexa);' upstream/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/huami/zeppos/ZeppOsCoordinator.java
           if grep -RFn "hmSensor.createSensor" gts4-mini-alexa/; then
             echo "Unexpected undocumented sensor call"
             exit 1
@@ -73,14 +75,14 @@ jobs:
           find upstream/app/build/outputs/apk -type f -name '*.apk' -print
           APK=$(find upstream/app/build/outputs/apk -type f -name '*.apk' | grep -i nopebble | head -n 1)
           test -n "$APK"
-          cp "$APK" outputs/GTS4Mini_AlexaCapture_Gadgetbridge_v3.0.apk
-          file outputs/GTS4Mini_AlexaCapture_Gadgetbridge_v3.0.apk
-          unzip -t outputs/GTS4Mini_AlexaCapture_Gadgetbridge_v3.0.apk | tail -n 2
-          sha256sum outputs/GTS4Mini_AlexaCapture_Gadgetbridge_v3.0.apk
+          cp "$APK" outputs/GTS4Mini_AlexaCapture_Gadgetbridge_v3.1.apk
+          file outputs/GTS4Mini_AlexaCapture_Gadgetbridge_v3.1.apk
+          unzip -t outputs/GTS4Mini_AlexaCapture_Gadgetbridge_v3.1.apk | tail -n 2
+          sha256sum outputs/GTS4Mini_AlexaCapture_Gadgetbridge_v3.1.apk
       - name: Upload installable APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GTS4Mini_AlexaCapture_Gadgetbridge_v3.0
-          path: outputs/GTS4Mini_AlexaCapture_Gadgetbridge_v3.0.apk
+          name: GTS4Mini_AlexaCapture_Gadgetbridge_v3.1
+          path: outputs/GTS4Mini_AlexaCapture_Gadgetbridge_v3.1.apk
           retention-days: 30
           if-no-files-found: error
