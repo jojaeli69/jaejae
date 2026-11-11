@@ -6,6 +6,12 @@ on:
     paths:
       - 'gts4-mini-probe/**'
       - '.github/workflows/gts4-mini-probe-release.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'gts4-mini-probe/**'
+      - '.github/workflows/gts4-mini-probe-release.yml'
   workflow_dispatch:
 concurrency:
   group: gts4-mini-probe-release
