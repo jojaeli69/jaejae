@@ -51,7 +51,7 @@ one(settings,
         try {
             android.view.autofill.AutofillManager mgr =
                     (android.view.autofill.AutofillManager)
-                    getSystemService(android.content.Context.AUTOFILL_SERVICE);
+                    getSystemService(android.view.autofill.AutofillManager.class);
             android.content.ComponentName chosen = mgr != null
                     ? mgr.getAutofillServiceComponentName() : null;
             if (chosen == null) providerText = "자동입력 서비스: 선택되지 않음 또는 사용할 수 없음";
