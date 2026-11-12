@@ -90,17 +90,24 @@ swap(ime,
         return autofill.request(t, Ui.dp(this, 52), maxWidth);''',
 "larger Android inline chip presentation specs")
 
-swap(ime,
-'''        boolean suggesting = (suggestBar != null && suggestBar.getVisibility() == View.VISIBLE) || autofillShowing()
-                || editing || candidates;''',
-'''        // Autofill is displayed in a separate row, so leave icon slots.
-        boolean suggesting = (suggestBar != null && suggestBar.getVisibility() == View.VISIBLE)
-                || editing || candidates;''',
-"do not shrink toolbar icons for autofill")
-swap(ime,
-'''        boolean on = prefs.toolbar() || toolbarOnlyNow();''',
-'''        boolean on = prefs.toolbar() || toolbarOnlyNow() || autofillShowing();''',
-"keep icon row visible for incoming autofill")
+# Existing translation/customization patches sometimes add conditions to the
+# suggesting expression, so modify only the autofill term while preserving all
+# their other reasons to collapse toolbar buttons.
+text_ime=ime.read_text(encoding="utf-8")
+start=text_ime.index("        boolean suggesting = ")
+finish=text_ime.index(";",start)+1
+statement=text_ime[start:finish]
+assert "autofillShowing()" in statement,statement
+import re
+updated,n=re.subn(r"\s*\|\|\s*autofillShowing\(\)", "", statement, count=1)
+assert n==1,(statement,n)
+text_ime=text_ime.replace(statement,updated,1)
+start=text_ime.index("        boolean on = prefs.toolbar()")
+finish=text_ime.index(";",start)+1
+on_statement=text_ime[start:finish]
+assert "autofillShowing()" not in on_statement
+text_ime=text_ime.replace(on_statement,on_statement[:-1]+" || autofillShowing();",1)
+ime.write_text(text_ime,encoding="utf-8")
 
 swap(ime,
 '''        // 방금 복사한 내용 칩은 추천·자동 완성 칩이 없을 때 빈 공간 자리에 뜬다 (도구 버튼은 그대로 보인다).
