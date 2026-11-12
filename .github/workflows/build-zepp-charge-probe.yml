@@ -1,0 +1,48 @@
+name: Build Zepp Charge Probe APK
+on:
+  push:
+    branches: [zepp-charge-bridge-probe-20261112]
+    paths:
+      - 'zepp-charge-probe/**'
+      - '.github/workflows/build-zepp-charge-probe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install SDK build dependencies
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Compile local-only diagnostic APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          JAR="$ANDROID_HOME/platforms/android-35/android.jar"
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          test -s "$JAR"
+          mkdir -p build/classes build/dex build/final
+          javac -encoding UTF-8 -source 8 -target 8 -cp "$JAR" -d build/classes zepp-charge-probe/*.java
+          "$BT/d8" --min-api 26 --lib "$JAR" --output build/dex build/classes/org/example/zeppchargeprobe/*.class
+          "$BT/aapt2" link -o build/unsigned.apk --manifest zepp-charge-probe/AndroidManifest.xml -I "$JAR" --min-sdk-version 26 --target-sdk-version 32
+          (cd build/dex && zip -q -j ../unsigned.apk classes.dex)
+          "$BT/zipalign" -f -p 4 build/unsigned.apk build/aligned.apk
+          keytool -genkeypair -keystore build/probe-debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Zepp Charge Probe Test,OU=Dev,O=Local,L=Seoul,C=KR" -noprompt
+          "$BT/apksigner" sign --ks build/probe-debug.keystore --ks-pass pass:android --key-pass pass:android --out build/final/ZeppChargeProbe_v1.apk build/aligned.apk
+          "$BT/apksigner" verify --verbose build/final/ZeppChargeProbe_v1.apk
+          "$BT/aapt" dump badging build/final/ZeppChargeProbe_v1.apk | head -n 12
+          sha256sum build/final/ZeppChargeProbe_v1.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZeppChargeProbe-v1-APK
+          path: build/final/ZeppChargeProbe_v1.apk
+          if-no-files-found: error
