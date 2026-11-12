@@ -109,28 +109,21 @@ assert "autofillShowing()" not in on_statement
 text_ime=text_ime.replace(on_statement,on_statement[:-1]+" || autofillShowing();",1)
 ime.write_text(text_ime,encoding="utf-8")
 
-swap(ime,
-'''        // 방금 복사한 내용 칩은 추천·자동 완성 칩이 없을 때 빈 공간 자리에 뜬다 (도구 버튼은 그대로 보인다).
-        boolean chip = !suggesting && on && clipChipShowing();
-        toolSpacer.setVisibility(suggesting || chip ? View.GONE : View.VISIBLE);
-        if (clipChipSlot != null) {
-            if (chip) {
-                boolean masked = clipChipPreview == null || passwordField;
-                clipChip.setLabel(masked ? "••••••" : clipChipPreview);
-                clipChip.setContentDescription(masked ? "복사한 내용 붙여넣기" : "붙여넣기: " + clipChipPreview);
-            }
-            clipChipSlot.setVisibility(chip ? View.VISIBLE : View.GONE);
-        }
-    }''',
-'''        // Clipboard previews also use only the conditional dedicated row.
-        // Leave the first toolbar row for icons at full tap-target size.
-        toolSpacer.setVisibility(suggesting ? View.GONE : View.VISIBLE);
+# This part of the toolbar has changed across earlier clipboard/translation
+# patches; replace only the final chip-display tail of the method, preserving
+# the rest of the user's original toolbar behavior.
+src=ime.read_text(encoding="utf-8")
+method=src.index("    private void refreshToolbarVisibility()")
+start=src.index("        boolean chip =",method)
+end=src.index("\n    /** 방금 복사한 내용 칩",start)
+assert end-start < 1600, ("unexpected refreshToolbarVisibility tail",end-start)
+src=src[:start]+'''        toolSpacer.setVisibility(suggesting ? View.GONE : View.VISIBLE);
         if (clipChipSlot != null) clipChipSlot.setVisibility(View.GONE);
         updateEventPreviewRow(candidates);
     }
 
-    /** A second row appears ONLY for autofill or freshly copied text.
-     * Password/sensitive clip contents are never disclosed in preview. */
+    /** Only Autofill inline suggestions or freshly copied text use this
+     * second row. Protect sensitive/secret clipboard previews. */
     private void updateEventPreviewRow(boolean candidatesVisible) {
         if (eventPreviewRow == null || eventCopiedPreview == null) return;
         boolean inline = panel == PANEL_KEYBOARD && autofillShowing()
@@ -149,8 +142,9 @@ swap(ime,
             eventPreviewRow.setVisibility(next);
             if (keyboard != null) updatePanelSizes();
         }
-    }''',
-"conditional row visibility and secure clipboard display")
+    }
+''' + src[end:]
+ime.write_text(src,encoding="utf-8")
 
 # Avoid shrinking/fragmented inline account text: request 16sp in the
 # AndroidX-compatible inline presentation style. Provider controls rendering.
