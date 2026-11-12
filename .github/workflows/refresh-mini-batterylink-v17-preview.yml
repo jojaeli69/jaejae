@@ -1,0 +1,92 @@
+name: Refresh GTS4 Mini BatteryLink v1.7 developer preview ZPK
+on:
+  push:
+    branches: [gts4mini-batterylink-v17-production-20261112]
+    paths:
+      - '.github/workflows/refresh-mini-batterylink-v17-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  preview-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gts4mini-batterylink-v17-production-20261112
+      - name: Refresh real preview mode and expiration metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import io, json, zipfile, pathlib, hashlib, time
+          src=pathlib.Path('GTS4Mini_BatteryLink_v1_7_WidgetAck_Preview.zpk')
+          assert src.is_file(), 'original Zepp preview package missing'
+          dst=pathlib.Path('downloads/GTS4Mini_BatteryLink_v1_7_DevPreview.zpk')
+          dst.parent.mkdir(parents=True,exist_ok=True)
+          now=int(time.time())
+          def build_zip(items):
+              b=io.BytesIO()
+              with zipfile.ZipFile(b,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+                  for n,data in items:z.writestr(n,data)
+              return b.getvalue()
+          with zipfile.ZipFile(src) as outer:
+              contents=[]
+              assert {'device.zip','app-side.zip'}.issubset(set(outer.namelist()))
+              for name in outer.namelist():
+                  data=outer.read(name)
+                  if name in ('device.zip','app-side.zip'):
+                      with zipfile.ZipFile(io.BytesIO(data)) as inner:
+                          entries=[]
+                          for member in inner.namelist():
+                              raw=inner.read(member)
+                              if member=='app.json':
+                                  cfg=json.loads(raw)
+                                  assert cfg['app']['appId']==90002611
+                                  assert cfg['app']['version']['code']==7
+                                  assert cfg['app']['appType']=='app'
+                                  cfg.setdefault('packageInfo',{})['mode']='preview'
+                                  cfg['packageInfo']['timeStamp']=now
+                                  cfg['packageInfo']['expiredTime']=604800
+                                  raw=json.dumps(cfg,ensure_ascii=False,separators=(',',':')).encode()
+                              entries.append((member,raw))
+                          data=build_zip(entries)
+                  contents.append((name,data))
+          dst.write_bytes(build_zip(contents))
+          with zipfile.ZipFile(dst) as outer:
+              for n in ('device.zip','app-side.zip'):
+                  with zipfile.ZipFile(io.BytesIO(outer.read(n))) as inner:
+                      cfg=json.loads(inner.read('app.json'))
+                      assert cfg['packageInfo']['mode']=='preview'
+                      assert cfg['packageInfo']['timeStamp']==now
+                      assert cfg['packageInfo']['expiredTime']==604800
+                      assert cfg['app']['appId']==90002611
+                      assert cfg['app']['version']['code']==7
+                      assert any(v['name']=='gts-4-mini' for v in cfg['platforms'])
+                      print(n,'mode',cfg['packageInfo']['mode'],'timestamp',now,'appType',cfg['app']['appType'],'version',cfg['app']['version'])
+                  if n=='device.zip':
+                      with zipfile.ZipFile(io.BytesIO(outer.read(n))) as inner:
+                          assert 'app.bin' in inner.namelist()
+                          assert 'page/index.bin' in inner.namelist()
+                  else:
+                      with zipfile.ZipFile(io.BytesIO(outer.read(n))) as inner:assert 'app-side.js' in inner.namelist()
+          print('SHA256',hashlib.sha256(dst.read_bytes()).hexdigest())
+          print('SIZE',dst.stat().st_size)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GTS4Mini-BatteryLink-v1.7-DevPreview-20261112
+          path: downloads/GTS4Mini_BatteryLink_v1_7_DevPreview.zpk
+          if-no-files-found: error
+      - name: Publish refreshed preview ZPK for QR install
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/GTS4Mini_BatteryLink_v1_7_DevPreview.zpk
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish Zepp Mini BatteryLink v1.7 valid developer preview ZPK [skip ci]'
+            git push origin HEAD:gts4mini-batterylink-v17-production-20261112
+          fi
