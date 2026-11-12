@@ -34,6 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          sed -i 's/android:versionCode="10079"/android:versionCode="10080"/' batterytrio-v80-src/test_protocol.sh
           bash batterytrio-v80-src/test_protocol.sh
           mkdir -p /tmp/v80-classes
           javac -encoding UTF-8 -d /tmp/v80-classes \
