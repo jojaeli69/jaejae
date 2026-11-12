@@ -88,6 +88,7 @@ jobs:
           python3 ../newswipe/fix_translation_v218.py
           python3 ../newswipe/fix_mlkit_release_npe_v219.py
           python3 ../newswipe/samsung_pass_popup_v220.py
+          python3 ../newswipe/conditional_event_row_v221.py
           mkdir -p /tmp/newswipe-clipboard-test
           javac -d /tmp/newswipe-clipboard-test \
             app/src/main/java/com/alternative_studios/newswipe/clipboard/ClipboardHistory.java \
@@ -104,8 +105,8 @@ jobs:
           s = s.replace("        versionCode = 21", "        ndk {\n            abiFilters.add(\"arm64-v8a\")\n        }\n        versionCode = 21")
           s = s.replace('applicationId = "com.alternative_studios.newswipe"',
                         'applicationId = "com.alternative_studios.newswipe.personal"')
-          s = s.replace("versionCode = 21", "versionCode = 110")
-          s = s.replace('versionName = "1.9.1"', 'versionName = "2.2.0-stable"')
+          s = s.replace("versionCode = 21", "versionCode = 111")
+          s = s.replace('versionName = "1.9.1"', 'versionName = "2.2.1-stable"')
           # No changing debug suffix: stable package ID must stay constant.
           p.write_text(s)
           Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
