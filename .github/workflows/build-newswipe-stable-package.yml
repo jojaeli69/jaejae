@@ -106,8 +106,8 @@ jobs:
           s = s.replace("        versionCode = 21", "        ndk {\n            abiFilters.add(\"arm64-v8a\")\n        }\n        versionCode = 21")
           s = s.replace('applicationId = "com.alternative_studios.newswipe"',
                         'applicationId = "com.alternative_studios.newswipe.personal"')
-          s = s.replace("versionCode = 21", "versionCode = 112")
-          s = s.replace('versionName = "1.9.1"', 'versionName = "2.2.2-stable"')
+          s = s.replace("versionCode = 21", "versionCode = 113")
+          s = s.replace('versionName = "1.9.1"', 'versionName = "2.2.3-stable"')
           # No changing debug suffix: stable package ID must stay constant.
           p.write_text(s)
           Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
