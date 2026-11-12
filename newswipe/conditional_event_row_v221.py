@@ -92,14 +92,15 @@ swap(ime,
 
 swap(ime,
 '''        boolean suggesting = (suggestBar != null && suggestBar.getVisibility() == View.VISIBLE) || autofillShowing()
-                || editing || candidates;
-        boolean on = prefs.toolbar() || toolbarOnlyNow();''',
-'''        // Autofill is now in its own row, so it must not steal the toolbar
-        // icon slots. Word/candidate/edit suggestions retain old behavior.
+                || editing || candidates;''',
+'''        // Autofill is displayed in a separate row, so leave icon slots.
         boolean suggesting = (suggestBar != null && suggestBar.getVisibility() == View.VISIBLE)
-                || editing || candidates;
-        boolean on = prefs.toolbar() || toolbarOnlyNow() || autofillShowing();''',
-"do not hide icons while autofill visible")
+                || editing || candidates;''',
+"do not shrink toolbar icons for autofill")
+swap(ime,
+'''        boolean on = prefs.toolbar() || toolbarOnlyNow();''',
+'''        boolean on = prefs.toolbar() || toolbarOnlyNow() || autofillShowing();''',
+"keep icon row visible for incoming autofill")
 
 swap(ime,
 '''        // 방금 복사한 내용 칩은 추천·자동 완성 칩이 없을 때 빈 공간 자리에 뜬다 (도구 버튼은 그대로 보인다).
