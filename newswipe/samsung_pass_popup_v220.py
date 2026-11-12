@@ -38,14 +38,8 @@ one(ime,
 "IME standard popup fallback")
 settings=root/"SettingsActivity.java"
 one(settings,
-'''            autofill.addView(toggle("자동 완성 제안",
-                    "자동 완성 서비스의 내용(예: 아이디와 비밀번호, 인증 코드)을 도구 막대에 보여 줍니다. ",
-                    Prefs.AUTOFILL_INLINE, prefs.autofillInline()));
-            autofill.addView(note("기기 설정에서 고른 자동 완성 서비스(Autofill with Google, 삼성 패스 등)를 사용합니다. "));''',
-'''            autofill.addView(toggle("자동 완성 제안",
-                    "선택한 자동완성 서비스의 계정 제안을 받습니다. 비밀번호는 키보드가 읽지 않습니다.",
-                    Prefs.AUTOFILL_INLINE, prefs.autofillInline()));
-            autofill.addView(toggle("삼성패스 호환 모드 (앱 위 팝업)",
+'''            autofill.addView(note("기기 설정에서 고른 자동 완성 서비스(Autofill with Google, 삼성 패스 등)를 사용합니다. "));''',
+'''            autofill.addView(toggle("삼성패스 호환 모드 (앱 위 팝업)",
                     "삼성 기기에서는 기본 켜짐. 키보드 안쪽 칩 대신 Android의 기본 자동입력 팝업을 사용합니다. "
                     + "이 방식에서도 앱이 자동완성을 지원해야 제안이 나타납니다. "
                     + "끄면 키보드 위 자동완성 칩을 사용합니다.",
