@@ -1,0 +1,84 @@
+name: Publish GTS4 Mini BatteryLink v1.7 non-preview ZPK
+on:
+  push:
+    branches: [gts4mini-batterylink-v17-production-20261112]
+    paths:
+      - '.github/workflows/publish-mini-batterylink-v17-production.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  production-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gts4mini-batterylink-v17-production-20261112
+      - name: Repackage previously compiled Zeus v1.7 ZPK without preview mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import io, json, zipfile, pathlib, hashlib, datetime
+          src=pathlib.Path('GTS4Mini_BatteryLink_v1_7_WidgetAck_Preview.zpk')
+          dst=pathlib.Path('downloads/GTS4Mini_BatteryLink_v1_7_Production.zpk')
+          dst.parent.mkdir(exist_ok=True, parents=True)
+          def makezip(items):
+              out=io.BytesIO()
+              with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+                  for n,bytes_ in items:
+                      z.writestr(n,bytes_)
+              return out.getvalue()
+          with zipfile.ZipFile(src) as outer:
+              names=outer.namelist()
+              assert 'device.zip' in names and 'app-side.zip' in names, names
+              patched=[]
+              for name in names:
+                  raw=outer.read(name)
+                  if name in ('device.zip','app-side.zip'):
+                      with zipfile.ZipFile(io.BytesIO(raw)) as inner:
+                          items=[]
+                          for info in inner.infolist():
+                              b=inner.read(info.filename)
+                              if info.filename=='app.json':
+                                  meta=json.loads(b)
+                                  assert meta['app']['appId']==90002611,meta
+                                  assert meta['app']['version']['code']==7,meta
+                                  assert meta.get('packageInfo',{}).get('mode')=='preview',meta
+                                  meta['packageInfo']['mode']='production'
+                                  # Official v1 production package carries a 2-day expiration
+                                  # metadata field too; avoid introducing custom expiry changes.
+                                  b=json.dumps(meta,ensure_ascii=False,separators=(',',':')).encode()
+                              items.append((info.filename,b))
+                          raw=makezip(items)
+                  patched.append((name,raw))
+          dst.write_bytes(makezip(patched))
+          with zipfile.ZipFile(dst) as outer:
+              for n in ('device.zip','app-side.zip'):
+                  with zipfile.ZipFile(io.BytesIO(outer.read(n))) as inner:
+                      cfg=json.loads(inner.read('app.json'))
+                      assert cfg['packageInfo']['mode']=='production'
+                      assert cfg['app']['version']['code']==7
+                      print(n,'mode',cfg['packageInfo']['mode'],'version',cfg['app']['version'],'platforms',cfg.get('platforms'))
+                  if n=='device.zip':
+                      with zipfile.ZipFile(io.BytesIO(outer.read(n))) as inner:
+                          assert 'page/index.bin' in inner.namelist(), inner.namelist()
+          print('OUTPUT',dst,len(dst.read_bytes()),hashlib.sha256(dst.read_bytes()).hexdigest())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GTS4Mini-BatteryLink-v1.7-Production-ZPK
+          path: downloads/GTS4Mini_BatteryLink_v1_7_Production.zpk
+          if-no-files-found: error
+      - name: Publish stable public ZPK download for QR
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/GTS4Mini_BatteryLink_v1_7_Production.zpk
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish Zepp GTS4 Mini battery v1.7 production ZPK [skip ci]"
+            git push origin HEAD:gts4mini-batterylink-v17-production-20261112
+          fi
