@@ -26,6 +26,7 @@ jobs:
           set -euo pipefail
           mkdir -p batterytrio-v79-src
           base64 -d batterytrio-v79-payload/source.tar.xz.b64 | xz -d | tar -x -C batterytrio-v79-src
+          cp batterytrio-v79-payload/build_v79.sh batterytrio-v79-src/build_v79.sh
           test -f batterytrio-v79-src/build_v79.sh
           grep -q 'HuamiBatteryQuery.ENCRYPTED' batterytrio-v79-src/app/src/main/java/org/example/galaxybatterybridge/MiniHuamiAuthMonitor.java
       - name: Test protocol before building
