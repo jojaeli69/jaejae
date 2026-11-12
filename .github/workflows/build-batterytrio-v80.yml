@@ -1,0 +1,91 @@
+name: Build BatteryTrio Mini v80 estimate-only APK
+on:
+  push:
+    branches: [batterytrio-v80-trend-20261112]
+    paths:
+      - 'batterytrio-v80/**'
+      - '.github/workflows/build-batterytrio-v80.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: batterytrio-v80-trend-20261112
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Decode v79 base and apply v80 estimates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p batterytrio-v80-src
+          base64 -d batterytrio-v79-payload/source.tar.xz.b64 | xz -d | tar -x -C batterytrio-v80-src
+          cp batterytrio-v79-payload/build_v79.sh batterytrio-v80-src/build_v79.sh
+          python3 batterytrio-v80/patch_v80.py
+          sed -i 's/org.example.galaxybatterybridge.history/org.example.galaxybatterybridge.v80/g' batterytrio-v80-src/build_v79.sh
+          grep -q 'org.example.galaxybatterybridge.v80' batterytrio-v80-src/build_v79.sh
+      - name: Run static Java battery movement tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash batterytrio-v80-src/test_protocol.sh
+          mkdir -p /tmp/v80-classes
+          javac -encoding UTF-8 -d /tmp/v80-classes \
+            batterytrio-v80-src/app/src/main/java/org/example/galaxybatterybridge/MiniChargeHeuristic.java \
+            batterytrio-v80-src/MiniChargeHeuristicTest.java
+          java -cp /tmp/v80-classes org.example.galaxybatterybridge.MiniChargeHeuristicTest
+      - name: Ensure Android SDK available
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+          test -s "$ANDROID_HOME/platforms/android-35/android.jar"
+      - name: Generate isolated v80 signer (NOT an update to existing v79)
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -noprompt -keystore "$RUNNER_TEMP/v80-test.jks" \
+            -storepass changeit -keypass changeit -alias gts4-test -keyalg RSA \
+            -keysize 3072 -validity 3650 -dname "CN=BatteryTrioMini v80 Test,O=Local Test"
+          echo "GTS4_SIGNING_KEY=$RUNNER_TEMP/v80-test.jks" >> "$GITHUB_ENV"
+      - name: Build independent v80 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd batterytrio-v80-src
+          ANDROID_SDK_ROOT="$ANDROID_HOME" bash build_v79.sh
+          mkdir -p ../downloads
+          cp BatteryTrioMini_v79.apk ../downloads/BatteryTrioMini_v80_Standalone.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging ../downloads/BatteryTrioMini_v80_Standalone.apk |
+            grep -m 1 "package: name='org.example.galaxybatterybridge.v80'"
+      - name: Verify package signature and build outputs
+        run: |
+          set -euo pipefail
+          f=downloads/BatteryTrioMini_v80_Standalone.apk
+          unzip -t "$f" >/dev/null
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$f"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$f" | head -n 12
+          sha256sum "$f"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BatteryTrioMini-v80-LevelEstimate-Standalone-APK
+          path: downloads/BatteryTrioMini_v80_Standalone.apk
+          if-no-files-found: error
+      - name: Publish for download (does not overwrite original v79)
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/BatteryTrioMini_v80_Standalone.apk
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish BatteryTrioMini v80 isolated test APK [skip ci]"
+            git push origin HEAD:batterytrio-v80-trend-20261112
+          fi
