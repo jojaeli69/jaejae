@@ -1,0 +1,95 @@
+name: Build BatteryTrioMini v79 APK (standalone and reinstall)
+on:
+  push:
+    branches: [build-batterytrio-mini-v79-20261112]
+    paths:
+      - 'batterytrio-v79-payload/**'
+      - '.github/workflows/build-batterytrio-v79.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: build-batterytrio-mini-v79-20261112
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Decode source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p batterytrio-v79-src
+          base64 -d batterytrio-v79-payload/source.tar.xz.b64 | xz -d | tar -x -C batterytrio-v79-src
+          test -f batterytrio-v79-src/build_v79.sh
+          grep -q 'HuamiBatteryQuery.ENCRYPTED' batterytrio-v79-src/app/src/main/java/org/example/galaxybatterybridge/MiniHuamiAuthMonitor.java
+      - name: Test protocol before building
+        run: bash batterytrio-v79-src/test_protocol.sh
+      - name: Ensure Android SDK available
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/aapt2"
+      - name: Generate isolated signing identity (not an update signer)
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -noprompt -keystore "$RUNNER_TEMP/v79testkey.jks" -storepass changeit -keypass changeit -alias gts4-test -keyalg RSA -keysize 3072 -validity 3650 -dname "CN=BatteryTrioMini v79 Test,O=Local Test"
+          echo "GTS4_SIGNING_KEY=$RUNNER_TEMP/v79testkey.jks" >> "$GITHUB_ENV"
+      - name: Build stand-alone v79 APK that can coexist with installed v78
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd batterytrio-v79-src
+          sed -i 's/org.example.galaxybatterybridge.history/org.example.galaxybatterybridge.v79/g' build_v79.sh
+          sed -i 's/android:name="org.example.galaxybatterybridge.permission.ZEPP_RELAY"/android:name="org.example.galaxybatterybridge.v79.permission.ZEPP_RELAY"/g' app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="배터리 연동"/android:label="배터리 연동 v79 테스트"/' app/src/main/AndroidManifest.xml
+          ANDROID_SDK_ROOT="$ANDROID_HOME" bash build_v79.sh
+          mkdir -p ../downloads
+          cp BatteryTrioMini_v79.apk ../downloads/BatteryTrioMini_v79_Standalone.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging ../downloads/BatteryTrioMini_v79_Standalone.apk | grep -m 1 "package: name='org.example.galaxybatterybridge.v79'"
+      - name: Build original-package v79 APK (requires old app uninstalled; signing key differs)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd batterytrio-v79-src
+          sed -i 's/org.example.galaxybatterybridge.v79/org.example.galaxybatterybridge.history/g' build_v79.sh
+          sed -i 's/android:name="org.example.galaxybatterybridge.v79.permission.ZEPP_RELAY"/android:name="org.example.galaxybatterybridge.permission.ZEPP_RELAY"/g' app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="배터리 연동 v79 테스트"/android:label="배터리 연동"/' app/src/main/AndroidManifest.xml
+          ANDROID_SDK_ROOT="$ANDROID_HOME" bash build_v79.sh
+          cp BatteryTrioMini_v79.apk ../downloads/BatteryTrioMini_v79_Reinstall.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging ../downloads/BatteryTrioMini_v79_Reinstall.apk | grep -m 1 "package: name='org.example.galaxybatterybridge.history'"
+      - name: Validate both APK packages and signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in downloads/BatteryTrioMini_v79_Standalone.apk downloads/BatteryTrioMini_v79_Reinstall.apk; do
+            unzip -t "$f" >/dev/null
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$f"
+            sha256sum "$f"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BatteryTrioMini-v79-signed-test-APKs
+          path: downloads/*.apk
+          if-no-files-found: error
+      - name: Publish APKs in GitHub branch for direct download
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/BatteryTrioMini_v79_Standalone.apk downloads/BatteryTrioMini_v79_Reinstall.apk
+          if ! git diff --cached --quiet; then
+            git commit -m "Build signed BatteryTrioMini v79 Android test APKs [skip ci]"
+            git push origin HEAD:build-batterytrio-mini-v79-20261112
+          fi
