@@ -37,7 +37,7 @@ import android.os.SystemClock;
 import java.util.Locale;
 
 /**
- * Checks Android's already cached BluetoothDevice battery level and receives
+ * Receives
  * Android battery broadcasts. NO scanning, GATT connections, service discovery,
  * pairing, writes, or proprietary Huami authentication.
  *
@@ -82,12 +82,12 @@ public final class MiniSystemBattery {
         BatteryWidget.refreshWatch(c);
     }
     public static boolean onBatteryBroadcast(Context c,Intent intent) {
-        if(intent==null||!BluetoothDevice.ACTION_BATTERY_LEVEL_CHANGED.equals(intent.getAction())||!allowed(c))return false;
+        if(intent==null||!"android.bluetooth.device.action.BATTERY_LEVEL_CHANGED".equals(intent.getAction())||!allowed(c))return false;
         BluetoothDevice d;
         try {d=intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);}
         catch(Exception e){return false;}
         if(!matches(d))return false;
-        int level=intent.getIntExtra(BluetoothDevice.EXTRA_BATTERY_LEVEL,-1);
+        int level=intent.getIntExtra("android.bluetooth.device.extra.BATTERY_LEVEL",-1);
         receive(c,level,"Android Bluetooth 배터리 이벤트",true);
         return true;
     }
@@ -98,19 +98,11 @@ public final class MiniSystemBattery {
         if(!allowed(c))return;
         android.content.SharedPreferences p=c.getSharedPreferences("bridge",Context.MODE_PRIVATE);
         if(p.getBoolean("mini_auth_auto",false)||p.getBoolean("mini_ble_auto",false))return;
-        try {
-            BluetoothAdapter a=BluetoothAdapter.getDefaultAdapter();
-            if(a==null||!a.isEnabled())return;
-            for(BluetoothDevice d:a.getBondedDevices()){
-                if(!matches(d))continue;
-                int level=d.getBatteryLevel();
-                if(level>=0&&level<=100)receive(c,level,"Android Bluetooth 캐시",false);
-                else p.edit().putString("mini_system_status","Android에서 워치 잔량 미제공 (-1) · Zepp 자체 데이터 비공개 가능").apply();
-                return;
-            }
-            p.edit().putString("mini_system_status","Android에 등록된 GTS 4 Mini 배터리 장치 미발견").apply();
-        }catch(Exception e){
-            p.edit().putString("mini_system_status","Android 캐시 확인 실패: "+e.getClass().getSimpleName()).apply();
+        // Android's BluetoothDevice.getBatteryLevel() is a restricted non-SDK API.
+        // Listen to system battery broadcasts without a new GATT connection.
+        if(!p.getString("mini_source","").startsWith("Android")) {
+            p.edit().putString("mini_system_status",
+                "Android 배터리 이벤트 대기 중 · 추가 BLE 연결 없음").apply();
         }
     }
 }
@@ -179,7 +171,7 @@ edit(bridge,'            long now=System.currentTimeMillis();','            Mini
 # Display estimate and 100% behavior; do not state a proven charger signal.
 activity=JAVA/"MainActivity.java"
 original='''        String syncMode=huamiAuto?"Huami 인증 충전+잔량":standardAuto?"표준 BLE 잔량(60초)":"자동 수신 꺼짐";'''
-replacement='''        String syncMode=huamiAuto?"Huami 인증 충전+잔량 (Zepp 충돌 가능)":standardAuto?"표준 BLE 잔량(60초 · 충돌 가능)":"Zepp 수신/Android 잔량 캐시 (직접 BLE 없음)";'''
+replacement='''        String syncMode=huamiAuto?"Huami 인증 충전+잔량 (Zepp 충돌 가능)":standardAuto?"표준 BLE 잔량(60초 · 충돌 가능)":"Zepp 수신/Android 배터리 이벤트 (직접 BLE 없음)";'''
 edit(activity,original,replacement)
 original='''        String miniState=verifiedMiniCharge==1?" · 충전 중 (직접 확인)":verifiedMiniCharge==0?" · 충전 중 아님 (직접 확인)":
             MiniBatteryTrend.UP.equals(miniTrend)?" · 잔량 상승(충전 추정)":MiniBatteryTrend.DOWN.equals(miniTrend)?" · 잔량 하락":"";
