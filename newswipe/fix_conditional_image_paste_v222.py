@@ -68,26 +68,8 @@ new='''        // Existing screenshot/URI pipeline marks a copied photo with
 once(old,new,"restore explicit image preview and correct click route")
 ime.write_text(s,encoding="utf-8")
 
-# Avoid an uncaught failure from a revoked Samsung/gallery URI on the
-# background IO thread. ClipImages.save() usually returns null on such an
-# error; keep this path defensive as the clipboard provider may revoke URI
-# grants after a screen transition.
-s=ime.read_text(encoding="utf-8")
-old='''            String id=known!=null && ClipboardHistory.original(clipHistory.imageDir(),known).isFile()
-                    ? known : ClipImages.save(getContentResolver(),original,
-                            clipHistory.imageDir(),getCacheDir());'''
-new='''            String id=null;
-            try {
-                id=known!=null && ClipboardHistory.original(clipHistory.imageDir(),known).isFile()
-                        ? known : ClipImages.save(getContentResolver(),original,
-                                clipHistory.imageDir(),getCacheDir());
-            } catch (RuntimeException denied) {
-                android.util.Log.w("NewSwipeImage", "Cannot read clipboard image URI", denied);
-            }'''
-assert s.count(old)==1,("defensive uri access",s.count(old))
-s=s.replace(old,new,1)
-ime.write_text(s,encoding="utf-8")
-
+# Keep original image URI loader unchanged. The regression is the wrong
+# preview tap handler, not Android's content-URI transfer path.
 s=ime.read_text(encoding="utf-8")
 assert 'if (quickImageReady()) {\n                pasteQuickImage();' in s
 assert 'boolean image = panel == PANEL_KEYBOARD && quickImageReady();' in s
