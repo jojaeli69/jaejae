@@ -80,7 +80,7 @@ new='''        int max = KeyboardTranslatePanel.MAX_SOURCE_CHARS;
         if (!selected) {
             // Retain multi-line sentences in the current paragraph, not
             // just the text after the very last line break.
-            int paragraph = text.lastIndexOf("\\\\n\\\\n");
+            int paragraph = text.lastIndexOf("\\n\\n");
             if (paragraph >= 0) text = text.substring(paragraph + 2);
         }
         if (text.length() > max) {
@@ -90,7 +90,7 @@ new='''        int max = KeyboardTranslatePanel.MAX_SOURCE_CHARS;
             return;
         }
 '''
-assert 'substring(text.length() - 350)' in old and "lastIndexOf('\\\\n')" in old,old
+assert 'substring(text.length() - 350)' in old and "lastIndexOf('\\n')" in old,old
 s=s[:start]+new+s[end:]
 ime.write_text(s,encoding="utf-8")
 
@@ -122,7 +122,7 @@ helpers='''    /** Preserve the entire meaning-bearing passage by sending full s
                 for (int i = start + TRANSLATE_PART_CHARS / 2; i < end; i++) {
                     char c = input.charAt(i);
                     if (c == '.' || c == '!' || c == '?' || c == '。'
-                            || c == '！' || c == '？' || c == '\\\\n') sentence = i + 1;
+                            || c == '！' || c == '？' || c == '\\n') sentence = i + 1;
                     else if (Character.isWhitespace(c)) space = i + 1;
                 }
                 if (sentence > start) end = sentence;
@@ -164,7 +164,7 @@ helpers='''    /** Preserve the entire meaning-bearing passage by sending full s
             if (combined.length() != 0 && !Character.isWhitespace(combined.charAt(combined.length()-1))
                     && !Character.isWhitespace(result.charAt(0))) combined.append(' ');
             combined.append(result);
-            if (originalPart.endsWith("\\\\n") && !result.endsWith("\\\\n")) combined.append('\\\\n');
+            if (originalPart.endsWith("\\n") && !result.endsWith("\\n")) combined.append('\\n');
             translatePartAt(active, parts, index + 1, combined, token, success, fail);
         }).addOnFailureListener(fail::accept);
     }
