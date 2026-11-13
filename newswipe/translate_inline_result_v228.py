@@ -111,6 +111,8 @@ one('''    private void insertSource(String text) {
     }
 
     private void recordTranslation(String result) {
+        // Release translator locks after success so both editors stay usable.
+        invalidateTranslation();
         lastAppliedTranslation=result;
         resultHangul.reset();
         resultDraft.setLength(0);
