@@ -1,12 +1,9 @@
-name: Build NewSwipe stable release for private signing (2.1.2 retry)
+name: Build NewSwipe 2.2.9 direct translation
 on:
   push:
-    branches:
-      - newswipe-stable-updates-20261109
+    branches: [newswipe-v229-direct-translation]
+    paths: ['.github/workflows/build-newswipe-stable-package.yml']
   workflow_dispatch:
-  pull_request:
-    branches:
-      - newswipe-stable-updates-20261109
 
 permissions:
   contents: write
@@ -102,6 +99,24 @@ jobs:
           python3 ../newswipe/android_system_translate_v227.py
           python3 ../newswipe/translate_inline_source_v228.py
           python3 ../newswipe/translate_inline_result_v228.py
+          python3 - <<'PY'
+          from pathlib import Path
+          panel = Path("app/src/main/java/com/alternative_studios/newswipe/KeyboardTranslatePanel.java")
+          source = panel.read_text()
+          for line in (
+              '        addView(resultRow, new LayoutParams(LayoutParams.MATCH_PARENT, dp(55)));\n',
+              '        if (resultRow != null) resultRow.setVisibility(View.VISIBLE);\n',
+          ):
+              assert source.count(line) == 1
+              source = source.replace(line, '')
+          for old, new in (
+              ('결과를 눌러 수정 가능', '앱 입력창에서 바로 수정'),
+              ('수정한 번역 결과를 입력창에 반영했어요', '번역 결과를 입력창에 넣었어요'),
+          ):
+              source = source.replace(old, new)
+          assert source.count('actions.onTranslationCommitted();') >= 3
+          panel.write_text(source)
+          PY
           mkdir -p /tmp/newswipe-clipboard-test
           javac -d /tmp/newswipe-clipboard-test \
             app/src/main/java/com/alternative_studios/newswipe/clipboard/ClipboardHistory.java \
@@ -118,8 +133,8 @@ jobs:
           s = s.replace("        versionCode = 21", "        ndk {\n            abiFilters.add(\"arm64-v8a\")\n        }\n        versionCode = 21")
           s = s.replace('applicationId = "com.alternative_studios.newswipe"',
                         'applicationId = "com.alternative_studios.newswipe.personal"')
-          s = s.replace("versionCode = 21", "versionCode = 118")
-          s = s.replace('versionName = "1.9.1"', 'versionName = "2.2.8-stable"')
+          s = s.replace("versionCode = 21", "versionCode = 119")
+          s = s.replace('versionName = "1.9.1"', 'versionName = "2.2.9-stable"')
           # No changing debug suffix: stable package ID must stay constant.
           p.write_text(s)
           Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
