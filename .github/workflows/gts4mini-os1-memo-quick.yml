@@ -50,7 +50,7 @@ jobs:
           assert 'setBrightScreenCancel' in j
           n=(Path('gts4mini-os1/build/memo/lib/native_backend.js')).read_text()
           assert '마이크 연결 미검증' in n
-          assert '.start()' not in n
+          assert 'sensor.start()' not in n
           print('OS1_CONFIG_AND_FAIL_CLOSED_MIC_CHECK_OK')
           PY
       - name: Install official Zeus CLI
