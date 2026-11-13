@@ -47,6 +47,8 @@ assert "createMemoScreenHold" in page and "onRecordingStart" in page
 page_path.write_text(page,encoding='utf8')
 quick=D/'quick';(quick/'page').mkdir(parents=True)
 shutil.copy2(memo/'icon.png',quick/'icon.png')
+(quick/'assets'/'gts4mini').mkdir(parents=True)
+shutil.copy2(memo/'icon.png',quick/'assets'/'gts4mini'/'icon.png')
 q=json.loads(json.dumps(app))
 q['app']['appId']=90002241
 q['app']['appName']='퀵메모'
