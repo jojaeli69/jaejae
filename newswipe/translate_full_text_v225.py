@@ -84,7 +84,7 @@ once(panel,
 "preview height")
 once(panel,
 '''        entryRow.addView(submitButton, new LayoutParams(dp(57), dp(42)));
-        addView(entryRow, new LayoutParams(LayoutParams.MATCH_PARENT, dp(46)));''',
+        addView(entryRow, new LayoutParams(LayoutParams.MATCH_PARENT, dp(52)));''',
 '''        entryRow.addView(submitButton, new LayoutParams(dp(57), dp(64)));
         addView(entryRow, new LayoutParams(LayoutParams.MATCH_PARENT, dp(68)));''',
 "larger entry row")
