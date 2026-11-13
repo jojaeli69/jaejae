@@ -50,6 +50,21 @@ jobs:
           print('SOURCE_OK',a['app']['version'])
           PY
           printf '{"name":"gts4mini-memo90","version":"3.0.0","private":true}' > build/memo-app/package.json
+      - name: Isolate trial app ID from any existing Memo installation
+        run: |
+          python3 - <<'PY'
+          import pathlib,json
+          p=pathlib.Path('build/memo-app/app.json')
+          a=json.loads(p.read_text())
+          assert a['app']['appId']==90002201
+          a['app']['appId']=90002231
+          a['app']['appName']='Memo 90min Trial'
+          a['app']['version']={'code':31,'name':'3.1.0-90min-trial'}
+          for locale in ('ko-KR','en-US'):
+            a['i18n'][locale]['appName']='90분 화면시험' if locale=='ko-KR' else 'Memo 90m Trial'
+          p.write_text(json.dumps(a,ensure_ascii=False,indent=2)+'\n')
+          print('SAFE_TRIAL_ID_OK',a['app']['appId'])
+          PY
       - name: Install official Zepp Zeus CLI
         run: |
           npm install --global @zeppos/zeus-cli@1.9.3 --no-fund --no-audit
@@ -84,7 +99,7 @@ jobs:
           def app_json(path,data):
               if path!='app.json': return data
               a=json.loads(data)
-              assert a['app']['version']['code']==30, a['app']['version']
+              assert a['app']['version']['code']==31 and a['app']['appId']==90002231, a['app']['version']
               assert a['packageInfo']['mode'] in ('production','preview')
               a['packageInfo']['mode']='preview'
               patched.append(path)
@@ -100,7 +115,7 @@ jobs:
                   with zipfile.ZipFile(io.BytesIO(z.read(path))) as inner:
                       app=json.loads(inner.read('app.json'))
                       assert app['packageInfo']['mode']=='preview'
-                      assert app['app']['version']['code']==30
+                      assert app['app']['version']['code']==31
           print('OFFICIAL_BUILD_AND_PREVIEW_OK',dst.stat().st_size,hashlib.sha256(preview).hexdigest())
           PY
       - name: Publish preview binary to public raw GitHub URL
