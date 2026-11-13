@@ -4,6 +4,9 @@ on:
     branches:
       - newswipe-stable-updates-20261109
   workflow_dispatch:
+  pull_request:
+    branches:
+      - newswipe-stable-updates-20261109
 
 permissions:
   contents: write
@@ -15,6 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Record active build ID for diagnostics
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -117,6 +121,17 @@ jobs:
           Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
           Path("app/src/debug/res/values/strings.xml").write_text('<resources><string name="app_name">NewSwipe</string></resources>\n')
           PY
+          python3 - <<'PY'
+          from pathlib import Path
+          settings=Path("settings.gradle.kts")
+          s=settings.read_text(encoding="utf-8")
+          assert s.count("        mavenCentral()")==2
+          s=s.replace("        mavenCentral()",
+              '        maven { url = uri("https://maven.aliyun.com/repository/public") }\n'
+              '        maven { url = uri("https://maven.aliyun.com/repository/google") }\n'
+              '        mavenCentral()')
+          settings.write_text(s,encoding="utf-8")
+          PY
           sed -i '/^networkTimeout=/d' gradle/wrapper/gradle-wrapper.properties
           printf '\nnetworkTimeout=120000\n' >> gradle/wrapper/gradle-wrapper.properties
           for attempt in 1 2 3; do
@@ -144,7 +159,7 @@ jobs:
           if-no-files-found: error
 
       - name: Record successful artifact run id
-        if: success()
+        if: github.event_name == 'push' && success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
