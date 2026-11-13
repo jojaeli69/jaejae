@@ -155,14 +155,13 @@ one('''    private void insertSource(String text) {
         status.setText("수정한 번역 결과를 입력창에 반영했어요");
     }''',"safe editable output and result reapplication")
 
-# Return to source while keeping current output available for further edits.
-one('''            resultEditing = false;
-            showSourceText();
-            showResultText();''',
-'''            resultEditing = false;
-            submitButton.setText("번역");
-            showSourceText();
-            showResultText();''',"exit result mode on source touch")
+# Put the button label change inside a method, NOT in the constructor's
+# early click listener, because submitButton is a final field initialized later.
+one('''    private void showSourceText() {
+        String value=source();''',
+'''    private void showSourceText() {
+        if (!resultEditing) submitButton.setText("번역");
+        String value=source();''',"source-editor toolbar label")
 
 one('''        if (resultEditing) {
             if (resultDraft.length()+value.length()>LIMIT) return;
