@@ -1,0 +1,117 @@
+name: Build GTS4 Mini Memo 90min preview ZPK
+on:
+  push:
+    branches:
+      - codex/gts4mini-memo-90min-release
+    paths:
+      - 'gts4-mini-memo90/source.zip'
+      - '.github/workflows/gts4mini-memo90.yml'
+  workflow_dispatch:
+concurrency:
+  group: gts4mini-memo90-build
+  cancel-in-progress: true
+permissions:
+  contents: write
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/gts4mini-memo-90min-release
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Extract and inspect complete Memo source
+        run: |
+          set -euo pipefail
+          unzip -t gts4-mini-memo90/source.zip | tail -n 2
+          mkdir -p build/memo-app
+          unzip -q gts4-mini-memo90/source.zip -d build/memo-app
+          node --check build/memo-app/app.js
+          node --check build/memo-app/page/index.js
+          node --check build/memo-app/lib/recording_screen_hold.js
+          python3 - <<'PY'
+          import json,pathlib
+          p=pathlib.Path('build/memo-app')
+          a=json.loads((p/'app.json').read_text())
+          assert a['app']['version']['code']==30
+          assert {x['deviceSource'] for x in a['targets']['gts4mini']['platforms']}=={246,247}
+          s=(p/'lib/recording_screen_hold.js').read_text()
+          assert '5400' in s and 'setBrightScreen' in s and 'setBrightScreenCancel' in s
+          print('SOURCE_OK',a['app']['version'])
+          PY
+          printf '{"name":"gts4mini-memo90","version":"3.0.0","private":true}' > build/memo-app/package.json
+      - name: Install official Zepp Zeus CLI
+        run: |
+          npm install --global @zeppos/zeus-cli@1.9.3 --no-fund --no-audit
+          zeus --version
+      - name: Compile GTS 4 mini memo app officially
+        working-directory: build/memo-app
+        run: |
+          zeus build -t gts4mini
+          find dist -type f -size +0c -print
+      - name: Extract and verify preview ZPK
+        run: |
+          mkdir -p gts4-mini-memo90-public
+          python3 - <<'PY'
+          import zipfile,io,json,hashlib, pathlib, time
+          root=pathlib.Path('gts4-mini-memo90-public')
+          matches=list(pathlib.Path('build/memo-app/dist').rglob('*.zab'))
+          assert matches, 'No official ZAB generated'
+          zab=max(matches,key=lambda f:f.stat().st_size)
+          with zipfile.ZipFile(zab) as z:
+              matches=[n for n in z.namelist() if n.endswith('.zpk')]
+              assert matches, 'Official ZAB has no ZPK'
+              raw=z.read(matches[0])
+          assert raw[:4]==b'PK\x03\x04'
+          (root/'GTS4Mini_Memo_v3_90min_official.zpk').write_bytes(raw)
+          def rewrite(data, callback):
+              b=io.BytesIO()
+              with zipfile.ZipFile(io.BytesIO(data)) as src,zipfile.ZipFile(b,'w') as dst:
+                  for item in src.infolist():
+                      dst.writestr(item,callback(item.filename,src.read(item.filename)))
+              return b.getvalue()
+          patched=[]
+          def app_json(path,data):
+              if path!='app.json': return data
+              a=json.loads(data)
+              assert a['app']['version']['code']==30, a['app']['version']
+              assert a['packageInfo']['mode'] in ('production','preview')
+              a['packageInfo']['mode']='preview'
+              patched.append(path)
+              return json.dumps(a,ensure_ascii=False,separators=(',',':')).encode()
+          def outer(path,data):
+              return rewrite(data,app_json) if path in ('device.zip','app-side.zip') else data
+          preview=rewrite(raw,outer)
+          assert len(patched)==2,patched
+          dst=root/'GTS4Mini_Memo_v3_90min_PREVIEW.zpk'
+          dst.write_bytes(preview)
+          with zipfile.ZipFile(dst) as z:
+              for path in ('device.zip','app-side.zip'):
+                  with zipfile.ZipFile(io.BytesIO(z.read(path))) as inner:
+                      app=json.loads(inner.read('app.json'))
+                      assert app['packageInfo']['mode']=='preview'
+                      assert app['app']['version']['code']==30
+          print('OFFICIAL_BUILD_AND_PREVIEW_OK',dst.stat().st_size,hashlib.sha256(preview).hexdigest())
+          PY
+      - name: Publish preview binary to public raw GitHub URL
+        run: |
+          git config user.name 'GTS4 Mini Memo build bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add gts4-mini-memo90-public/GTS4Mini_Memo_v3_90min_official.zpk gts4-mini-memo90-public/GTS4Mini_Memo_v3_90min_PREVIEW.zpk
+          if git diff --cached --quiet; then
+            echo 'No binary change'
+          else
+            git commit -m 'Publish official Zepp GTS4 Mini memo90 preview'
+            git fetch origin codex/gts4mini-memo-90min-release
+            git rebase origin/codex/gts4mini-memo-90min-release
+            git push origin HEAD:codex/gts4mini-memo-90min-release
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GTS4Mini_Memo_v3_90min_Official_Preview
+          path: gts4-mini-memo90-public/*
+          if-no-files-found: error
