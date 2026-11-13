@@ -185,7 +185,11 @@ chunk=chunk.replace("        updateLanguageLabels();\n        showSourceText();"
 s=s[:start]+chunk+s[end:]
 
 one('''    public void onTypeText(String value, boolean tap, boolean korean) {
-        if (value==null || value.isEmpty() || source().length()>=LIMIT) return;''',
+        if (value==null || value.isEmpty()) return;
+        if (source().length() + value.length() > LIMIT) {
+            status.setText("번역 입력은 350자까지 지원해요");
+            return;
+        }''',
 '''    public void onTypeText(String value, boolean tap, boolean korean) {
         if (value==null || value.isEmpty()) return;
         if (resultEditing) {
@@ -194,7 +198,10 @@ one('''    public void onTypeText(String value, boolean tap, boolean korean) {
             showResultText();
             return;
         }
-        if (source().length()>=LIMIT) return;''',"typing result if active")
+        if (source().length() + value.length() > LIMIT) {
+            status.setText("번역 입력은 350자까지 지원해요");
+            return;
+        }''',"typing result if active")
 one('''            resetText(false);
             CharSequence text=data.getItemAt(0).getText();
             committed.append(text.length()>LIMIT?text.subSequence(0,LIMIT):text);
