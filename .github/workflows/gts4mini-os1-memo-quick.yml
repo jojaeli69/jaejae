@@ -1,0 +1,124 @@
+name: Build GTS4 Mini Zepp OS 1.0 Memo + QuickMemo 90min
+on:
+  push:
+    branches:
+      - codex/gts4mini-os1-memo-quick-90min
+    paths:
+      - "gts4mini-os1/**"
+      - ".github/workflows/gts4mini-os1-memo-quick.yml"
+  pull_request:
+    branches:
+      - codex/gts4-mini-probe-release
+    paths:
+      - "gts4mini-os1/**"
+      - ".github/workflows/gts4mini-os1-memo-quick.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: gts4mini-os1-dual-memo
+  cancel-in-progress: true
+jobs:
+  dual-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/gts4mini-os1-memo-quick-90min
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Restore and check Zepp OS 1.0 source
+        run: |
+          python3 gts4mini-os1/prepare.py
+          node --check gts4mini-os1/build/memo/page/index.js
+          node --check gts4mini-os1/build/memo/app.js
+          node --check gts4mini-os1/build/quick/page/index.js
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for part,ident in [('memo',90002201),('quick',90002241)]:
+              p=Path('gts4mini-os1/build')/part
+              j=json.loads((p/'app.json').read_text())
+              assert j['app']['appId']==ident
+              assert j['runtime']['apiVersion']['minVersion']=='1.0.0'
+              assert j['targets']['gts4mini']['designWidth']==336
+          j=(Path('gts4mini-os1/build/memo/lib/recording_screen_hold.js')).read_text()
+          assert 'MEMO_SCREEN_HOLD_SECONDS = 5400' in j
+          assert 'setBrightScreenCancel' in j
+          n=(Path('gts4mini-os1/build/memo/lib/native_backend.js')).read_text()
+          assert '마이크 연결 미검증' in n
+          assert '.start()' not in n
+          print('OS1_CONFIG_AND_FAIL_CLOSED_MIC_CHECK_OK')
+          PY
+      - name: Install official Zeus CLI
+        run: |
+          npm install --global @zeppos/zeus-cli@1.9.3 --no-audit --no-fund
+          zeus --version
+      - name: Build Memo and QuickMemo for GTS4 mini
+        run: |
+          cd gts4mini-os1/build/memo
+          zeus build -t gts4mini
+          cd ../quick
+          zeus build -t gts4mini
+      - name: Extract and verify both install packages
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile,io,json,hashlib,datetime
+          out=Path('gts4mini-os1-releases')
+          out.mkdir(exist_ok=True)
+          labels=[('memo','GTS4Mini_Memo_OS1_90min',90002201),('quick','GTS4Mini_QuickMemo_OS1_90min',90002241)]
+          def rewrite_zip(data, cb):
+              buf=io.BytesIO()
+              with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(buf,'w') as dest:
+                  for zi in source.infolist():
+                      dest.writestr(zi,cb(zi.filename,source.read(zi)))
+              return buf.getvalue()
+          for folder,name,appid in labels:
+              zab=next(Path('gts4mini-os1/build',folder,'dist').rglob('*.zab'))
+              with zipfile.ZipFile(zab) as root:
+                  bundle=next(x for x in root.namelist() if x.endswith('.zpk'))
+                  binary=root.read(bundle)
+              assert binary[:4]==b'PK\x03\x04'
+              def inner_cb(path,body):
+                  if path!='app.json':return body
+                  obj=json.loads(body)
+                  assert obj['app']['appId']==appid
+                  assert obj['runtime']['apiVersion']['minVersion'] in ('1.0','1.0.0')
+                  obj['packageInfo']['mode']='preview'
+                  return json.dumps(obj,ensure_ascii=False,separators=(',',':')).encode()
+              def outer_cb(path,body):
+                  return rewrite_zip(body,inner_cb) if path in ('device.zip','app-side.zip') else body
+              preview=rewrite_zip(binary,outer_cb)
+              with zipfile.ZipFile(io.BytesIO(preview)) as z:
+                  for sect in ('device.zip','app-side.zip'):
+                      with zipfile.ZipFile(io.BytesIO(z.read(sect))) as child:
+                          info=json.loads(child.read('app.json'))
+                          assert info['packageInfo']['mode']=='preview'
+                          assert info['app']['appId']==appid
+              (out/(name+'_OFFICIAL.zpk')).write_bytes(binary)
+              (out/(name+'_PREVIEW.zpk')).write_bytes(preview)
+              print(name,'PREVIEW_READY',len(preview),hashlib.sha256(preview).hexdigest())
+          PY
+      - name: Publish installable preview on isolated branch
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name 'GTS4Mini Build Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add gts4mini-os1-releases/
+          if git diff --cached --quiet; then
+            echo "No bundle changes"
+          else
+            git commit -m "Publish ZeppOS 1.0 Memo and QuickMemo developer preview"
+            git fetch origin codex/gts4mini-os1-memo-quick-90min
+            git rebase origin/codex/gts4mini-os1-memo-quick-90min
+            git push origin HEAD:codex/gts4mini-os1-memo-quick-90min
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GTS4Mini_OS1_Memo_QuickMemo_90min_Developer_Previews
+          path: gts4mini-os1-releases/*.zpk
+          if-no-files-found: error
