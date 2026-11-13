@@ -104,7 +104,6 @@ jobs:
               print(name,'PREVIEW_READY',len(preview),hashlib.sha256(preview).hexdigest())
           PY
       - name: Publish installable preview on isolated branch
-        if: github.event_name != 'pull_request'
         run: |
           git config user.name 'GTS4Mini Build Bot'
           git config user.email 'actions@users.noreply.github.com'
