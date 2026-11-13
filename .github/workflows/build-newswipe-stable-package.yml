@@ -1,7 +1,7 @@
-name: Build NewSwipe 2.2.9 direct translation
+name: Build NewSwipe 2.3.0 direct translation
 on:
   push:
-    branches: [newswipe-v229-direct-translation]
+    branches: [newswipe-v230-long-translation]
     paths: ['.github/workflows/build-newswipe-stable-package.yml']
   workflow_dispatch:
 
@@ -100,6 +100,34 @@ jobs:
           ):
               source = source.replace(old, new)
           assert source.count('actions.onTranslationCommitted();') >= 3
+          source = source.replace('        entry.setMaxLines(2);\n', '')
+          source = source.replace('        entry.setEllipsize(TextUtils.TruncateAt.END);\n', '')
+          old = '        entryRow.addView(entry, inputParams);'
+          assert source.count(old) == 1
+          source = source.replace(old, '''        sourceScroll = new android.widget.ScrollView(getContext());
+                  sourceScroll.setFillViewport(true);
+                  sourceScroll.addView(entry, new android.widget.FrameLayout.LayoutParams(
+                          LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+                  entryRow.addView(sourceScroll, inputParams);'''.replace('\n          ', '\n'))
+          old = '    private int sourceCaret;'
+          assert source.count(old) == 1
+          source = source.replace(old, old + '\n    private final android.widget.ScrollView sourceScroll;')
+          old = '        String value=source();'
+          assert source.count(old) == 1
+          source = source.replace(old, old + """
+                  sourceScroll.post(() -> {
+                      android.text.Layout layout = entry.getLayout();
+                      if (layout == null) return;
+                      int caret = Math.min(layout.getText().length(),
+                              sourceCaret + hangul.getComposing().length());
+                      int line = layout.getLineForOffset(caret);
+                      int top = entry.getTotalPaddingTop() + layout.getLineTop(line);
+                      int bottom = entry.getTotalPaddingTop() + layout.getLineBottom(line);
+                      int y = sourceScroll.getScrollY();
+                      if (top < y) sourceScroll.scrollTo(0, top);
+                      else if (bottom > y + sourceScroll.getHeight())
+                          sourceScroll.scrollTo(0, bottom - sourceScroll.getHeight());
+                  });""".replace('\n          ', '\n'))
           panel.write_text(source)
           PY
           mkdir -p /tmp/newswipe-clipboard-test
@@ -118,8 +146,8 @@ jobs:
           s = s.replace("        versionCode = 21", "        ndk {\n            abiFilters.add(\"arm64-v8a\")\n        }\n        versionCode = 21")
           s = s.replace('applicationId = "com.alternative_studios.newswipe"',
                         'applicationId = "com.alternative_studios.newswipe.personal"')
-          s = s.replace("versionCode = 21", "versionCode = 119")
-          s = s.replace('versionName = "1.9.1"', 'versionName = "2.2.9-stable"')
+          s = s.replace("versionCode = 21", "versionCode = 120")
+          s = s.replace('versionName = "1.9.1"', 'versionName = "2.3.0-stable"')
           # No changing debug suffix: stable package ID must stay constant.
           p.write_text(s)
           Path("app/src/debug/res/values").mkdir(parents=True, exist_ok=True)
