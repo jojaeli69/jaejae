@@ -1,0 +1,34 @@
+name: Verify public 90min Mini Memo QR
+on:
+  pull_request:
+    branches:
+      - codex/gts4-mini-probe-release
+    paths:
+      - '.github/workflows/verify-gts4mini-memo90.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Anonymous public download, CRC, preview, target, expiry
+        run: |
+          set -euo pipefail
+          URL='https://raw.githubusercontent.com/jojaeli69/jaejae/codex/gts4mini-memo-90min-release/gts4-mini-memo90-public/GTS4Mini_Memo_v3_90min_PREVIEW.zpk'
+          curl --retry 3 --max-time 30 -fLsS -D headers.txt -o memo90.zpk "$URL"
+          unzip -t memo90.zpk | tail -n 2
+          python3 - <<'PY'
+          import zipfile,io,json,time,hashlib
+          f=open('memo90.zpk','rb').read()
+          assert hashlib.sha256(f).hexdigest()=='1668cd95132d10c74562cb414aad6a074df4857379d07a0a3dc88dccc8978af8'
+          with zipfile.ZipFile(io.BytesIO(f)) as z:
+            for n in ('device.zip','app-side.zip'):
+              with zipfile.ZipFile(io.BytesIO(z.read(n))) as zz:
+                app=json.loads(zz.read('app.json'))
+                assert app['app']['version']['code']==30
+                assert app['packageInfo']['mode']=='preview'
+                assert int(app['packageInfo']['timeStamp'])+int(app['packageInfo']['expiredTime'])>int(time.time())
+                assert {x['deviceSource'] for x in app['platforms']}=={246,247}
+          print('ANONYMOUS_QR_DOWNLOAD_OK',len(f),hashlib.sha256(f).hexdigest())
+          PY
