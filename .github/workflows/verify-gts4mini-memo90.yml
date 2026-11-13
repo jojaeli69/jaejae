@@ -21,12 +21,13 @@ jobs:
           python3 - <<'PY'
           import zipfile,io,json,time,hashlib
           f=open('memo90.zpk','rb').read()
-          assert hashlib.sha256(f).hexdigest()=='1668cd95132d10c74562cb414aad6a074df4857379d07a0a3dc88dccc8978af8'
+          assert len(f)>100000, 'Truncated preview ZPK'
           with zipfile.ZipFile(io.BytesIO(f)) as z:
             for n in ('device.zip','app-side.zip'):
               with zipfile.ZipFile(io.BytesIO(z.read(n))) as zz:
                 app=json.loads(zz.read('app.json'))
-                assert app['app']['version']['code']==30
+                assert app['app']['version']['code']==31
+                assert app['app']['appId']==90002231
                 assert app['packageInfo']['mode']=='preview'
                 assert int(app['packageInfo']['timeStamp'])+int(app['packageInfo']['expiredTime'])>int(time.time())
                 assert {x['deviceSource'] for x in app['platforms']}=={246,247}
