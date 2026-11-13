@@ -6,6 +6,12 @@ on:
     paths:
       - 'gts4-mini-memo90/source.zip'
       - '.github/workflows/gts4mini-memo90.yml'
+  pull_request:
+    branches:
+      - codex/gts4-mini-probe-release
+    paths:
+      - 'gts4-mini-memo90/source.zip'
+      - '.github/workflows/gts4mini-memo90.yml'
   workflow_dispatch:
 concurrency:
   group: gts4mini-memo90-build
