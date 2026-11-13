@@ -28,6 +28,14 @@ once(panel,
             if (value.length() <= LIMIT) committed.append(value);''',
 "prevent silent selected-text shortening")
 
+# If the user taps translate while the cursor is after text, actually
+# prefill those existing sentences. Previously showSource silently discarded
+# all non-selected host text, leaving an empty panel despite reading it.
+once(panel,
+'''        if (selected && value != null) {''',
+'''        if (value != null && !value.isEmpty()) {''',
+"prefill complete host-editor source even when cursor text is not selected")
+
 once(panel,
 '''            status.setText("번역 입력은 350자까지 지원해요");''',
 '''            status.setText("번역 입력은 최대 " + LIMIT + "자까지 지원해요");''',
@@ -45,6 +53,20 @@ once(panel,
             committed.append(text);
             showSourceText();''',
 "never silently truncate pasted paragraphs")
+
+# A too-long clipboard item should not destroy the existing draft.
+once(panel,
+'''            resetText(false);
+            CharSequence text=data.getItemAt(0).getText();''',
+'''            CharSequence text=data.getItemAt(0).getText();''',
+"leave active source intact if pasted text exceeds maximum")
+once(panel,
+'''            committed.append(text);
+            showSourceText();''',
+'''            resetText(false);
+            committed.append(text);
+            showSourceText();''',
+"reset draft only after clipboard length was accepted")
 
 # Previously 1 line was always shown in a small 42dp chip, making a
 # complete source LOOK truncated even when it remained in memory.
