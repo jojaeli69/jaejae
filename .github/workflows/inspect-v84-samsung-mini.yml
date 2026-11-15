@@ -1,0 +1,42 @@
+name: Inspect Samsung GTS Mini widget row parser
+on:
+  push:
+    branches: [batterytrio-v84-samsung-gts4mini-20261115]
+    paths: ['.github/workflows/inspect-v84-samsung-mini.yml']
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Analyze source after v83 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p batterytrio-v80-src
+          base64 -d batterytrio-v79-payload/source.tar.xz.b64 | xz -d | tar -x -C batterytrio-v80-src
+          python3 batterytrio-v80/patch_v80.py
+          python3 batterytrio-v81/patch_v81.py
+          python3 batterytrio-v82/patch_v82.py
+          python3 batterytrio-v83/patch_v83.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('batterytrio-v80-src/app/src/main/java/org/example/galaxybatterybridge')
+          for fn in ('SamsungStateReader.java','SamsungWidgetBridge.java','SamsungStateReader.java','BatteryWidget.java','BridgeService.java','MainActivity.java'):
+            content=(src/fn).read_text().splitlines()
+            print('===== BEGIN '+fn)
+            if fn=='MainActivity.java':
+              for i,line in enumerate(content,1):
+                if 'widgetBridge' in line or 'SamsungWidget' in line or 'samsung' in line.lower() or 'native' in line.lower():
+                  print(f'{i:4d}: {line[:450]}')
+            elif fn=='BridgeService.java':
+              for i,line in enumerate(content,1):
+                if 'SamsungWidget' in line or 'BatteryWidget.refresh' in line or 'receiver' in line.lower():
+                  print(f'{i:4d}: {line[:450]}')
+            else:
+              for i,line in enumerate(content,1):
+                if len(line)>900: print(f'{i:4d}: {line[:900]}...TRUNC')
+                else: print(f'{i:4d}: {line}')
+            print('===== END '+fn)
+          PY
