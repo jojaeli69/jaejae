@@ -30,7 +30,7 @@ final class SamsungMiniSelector {
 # can duplicate the same number and are deliberately excluded from this fallback.
 bridge=J/"SamsungWidgetBridge.java"
 edit(bridge,
-     '    /** A user-approved host that actually received its provider\\'s RemoteViews. */',
+     "    /** A user-approved host that actually received its provider's RemoteViews. */",
      '''    /** Explicitly confirmed by owner: the second displayed device is GTS 4 Mini.
      * A fallback is permitted only for EXACTLY two numeric TextViews and a
      * first row that matches the Android phone battery reading.
@@ -166,6 +166,16 @@ edit(activity,
             BatteryWidget.refresh(this);
             update();
         });''')
+
+# In Samsung-first mode, never establish any independent BLE session even
+# if an old preference is accidentally re-enabled later.
+edit(J/"BridgeService.java",
+     '''        boolean auth=p.getBoolean("mini_auth_auto",false);
+        boolean basic=p.getBoolean("mini_ble_auto",false);''',
+     '''        boolean samsungMiniMode=p.getBoolean("samsungMiniMapEnabled",false);
+        boolean auth=!samsungMiniMode&&p.getBoolean("mini_auth_auto",false);
+        boolean basic=!samsungMiniMode&&p.getBoolean("mini_ble_auto",false);''')
+
 manifest=R/"app/src/main/AndroidManifest.xml"
 edit(manifest,'android:versionCode="10083" android:versionName="0.83-samsung-native-bridge"',
     'android:versionCode="10084" android:versionName="0.84-samsung-gts-mini-no-gatt"')
