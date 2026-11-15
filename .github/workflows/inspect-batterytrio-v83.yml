@@ -1,0 +1,38 @@
+name: Inspect BatteryTrio v82 charging event integration points
+on:
+  push:
+    branches: [batterytrio-v83-samsung-sync-20261115]
+    paths: ['.github/workflows/inspect-batterytrio-v83.yml']
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decode and inspect Android service and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p inspection
+          base64 -d batterytrio-v79-payload/source.tar.xz.b64 | xz -d | tar -x -C inspection
+          cp batterytrio-v79-payload/build_v79.sh inspection/build_v79.sh
+          mv inspection batterytrio-v80-src
+          python3 batterytrio-v80/patch_v80.py
+          python3 batterytrio-v81/patch_v81.py
+          python3 batterytrio-v82/patch_v82.py
+          python3 - <<'PY'
+          import pathlib,re
+          java=pathlib.Path('batterytrio-v80-src/app/src/main/java/org/example/galaxybatterybridge')
+          for f in ['BridgeService.java','BatteryWidget.java','BudsBatteryReceiver.java','SamsungWidgetBridge.java','MainActivity.java']:
+              p=java/f
+              print('FILE:',f,'exists',p.exists())
+              if not p.exists():continue
+              s=p.read_text()
+              for kw in ['onCreate(', 'onDestroy(', 'onStartCommand(', 'onReceive(', 'phoneCharging(', 'BatteryWidget.refreshWatch(', 'ACTION_BATTERY_CHANGED', 'ACTION_POWER_CONNECTED','getAppWidgetIds(', 'registerReceiver(']:
+                  allidx=[m.start() for m in re.finditer(re.escape(kw),s)]
+                  print('KEY:',kw,'count',len(allidx))
+                  for k in allidx[:3]:print(s[max(0,k-300):min(len(s),k+850)].replace('\n','\\n'))
+          m=pathlib.Path('batterytrio-v80-src/app/src/main/AndroidManifest.xml').read_text()
+          print('MANIFEST:\n',m[:11000])
+          PY
